@@ -24,7 +24,8 @@ impl PartialEq for PrioritizedMessage {
 impl Ord for PrioritizedMessage {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse ordering for max-heap behavior
-        other.effective_priority.cmp(&self.effective_priority)
+        // other.effective_priority.cmp(&self.effective_priority)
+        self.effective_priority.cmp(&other.effective_priority)
     }
 }
 
@@ -67,18 +68,17 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
-    use web3::error::TransportError::Message;
+    use crate::{Error, Message};
     use super::*;
-    use crate::gas_price::TransactionUrgency;
-    use web3::types::{Address, Bytes, U256};
+    use web3::types::{Address, U256};
 
     #[test]
-    fn test_priority_queue() {
+    fn test_priority_queue() -> Result<(), Error> {
         let mut queue = PriorityQueue::new();
 
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 1, TransactionUrgency::Low, vec![]);
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 2, TransactionUrgency::Medium, vec![]);
-        let msg3 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 3, TransactionUrgency::High, vec![]);
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![])?;
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![])?;
+        let msg3 = Message::new(Address::zero(), None, U256::zero(), None, None, 3,  vec![])?;
 
         queue.push(msg1);
         queue.push(msg2);
@@ -93,12 +93,13 @@ mod tests {
         assert_eq!(queue.pop().unwrap().priority, 1);
 
         assert!(queue.is_empty());
+        Ok(())
     }
 
     #[test]
-    fn test_prioritized_message_ordering() {
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 1, TransactionUrgency::Low, vec![]);
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 2, TransactionUrgency::Medium, vec![]);
+    fn test_prioritized_message_ordering() -> Result<(), Error> {
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![])?;
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![])?;
 
         let pm1 = PrioritizedMessage {
             message: msg1,
@@ -110,7 +111,8 @@ mod tests {
             effective_priority: 2,
         };
 
-        assert!(pm1 > pm2); // Remember, we want a max-heap, so higher priority should be "greater"
-        assert_eq!(pm1.cmp(&pm2), Ordering::Greater);
+        assert!(pm1 < pm2);
+        assert_eq!(pm1.cmp(&pm2), Ordering::Less);
+        Ok(())
     }
 }

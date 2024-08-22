@@ -1,4 +1,3 @@
-use std::error::Error;
 use web3::types::Address;
 
 pub mod priority_queue;
@@ -17,33 +16,32 @@ pub const SENDER_ADDRESS: Address = Address::zero(); // Replace with actual addr
 pub const MAX_DEPENDENCIES: usize = 5;
 pub const MAX_RETRIES: u32 = 3;
 
-/// The main error type for the happychain library
+/// The main error type for the TM library
 #[derive(Debug)]
-pub enum TMError {
+pub enum Error {
     Web3Error(web3::Error),
     TooManyDependencies(usize),
     GasPriceError(String),
-    // Add other error types as needed
 
 }
 
-impl std::fmt::Display for TMError {
+impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TMError::Web3Error(e) => write!(f, "Web3 error: {}", e),
-            TMError::TooManyDependencies(count) => write!(f, "Too many dependencies: {}", count),
-            TMError::GasPriceError(msg) => write!(f, "Gas price error: {}", msg),
+            Error::Web3Error(e) => write!(f, "Web3 error: {}", e),
+            Error::TooManyDependencies(count) => write!(f, "Too many dependencies: {}", count),
+            Error::GasPriceError(msg) => write!(f, "Gas price error: {}", msg),
             // Handle other error types
         }
     }
 }
 
-impl Error for TMError {}
+impl std::error::Error for Error {}
 
-impl From<web3::Error> for TMError {
+impl From<web3::Error> for Error {
     fn from(err: web3::Error) -> Self {
-        TMError::Web3Error(err)
+        Error::Web3Error(err)
     }
 }
 
-pub type Result<T> = std::result::Result<T, TMError>;
+pub type Result<T> = std::result::Result<T, Error>;
