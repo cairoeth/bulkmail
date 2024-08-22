@@ -1,34 +1,34 @@
-use crate::transaction::Transaction;
+use crate::message::Message;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 #[derive(Debug)]
 pub struct PriorityQueue {
-    heap: BinaryHeap<PrioritizedTransaction>,
+    heap: BinaryHeap<PrioritizedMessage>,
 }
 
 #[derive(Debug)]
-struct PrioritizedTransaction {
-    transaction: Transaction,
+struct PrioritizedMessage {
+    message: Message,
     effective_priority: u32,
 }
 
-impl Eq for PrioritizedTransaction {}
+impl Eq for PrioritizedMessage {}
 
-impl PartialEq for PrioritizedTransaction {
+impl PartialEq for PrioritizedMessage {
     fn eq(&self, other: &Self) -> bool {
         self.effective_priority == other.effective_priority
     }
 }
 
-impl Ord for PrioritizedTransaction {
+impl Ord for PrioritizedMessage {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse ordering for max-heap behavior
         other.effective_priority.cmp(&self.effective_priority)
     }
 }
 
-impl PartialOrd for PrioritizedTransaction {
+impl PartialOrd for PrioritizedMessage {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -41,13 +41,13 @@ impl PriorityQueue {
         }
     }
 
-    pub fn push(&mut self, transaction: Transaction) {
-        let effective_priority = transaction.effective_priority();
-        self.heap.push(PrioritizedTransaction { transaction, effective_priority });
+    pub fn push(&mut self, message: Message) {
+        let effective_priority = message.effective_priority();
+        self.heap.push(PrioritizedMessage { message, effective_priority });
     }
 
-    pub fn pop(&mut self) -> Option<Transaction> {
-        self.heap.pop().map(|pt| pt.transaction)
+    pub fn pop(&mut self) -> Option<Message> {
+        self.heap.pop().map(|pm| pm.message)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -67,26 +67,27 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
+    use web3::error::TransportError::Message;
     use super::*;
     use crate::gas_price::TransactionUrgency;
-    use web3::types::TransactionParameters;
+    use web3::types::{Address, Bytes, U256};
 
     #[test]
     fn test_priority_queue() {
         let mut queue = PriorityQueue::new();
 
-        let tx1 = Transaction::new(TransactionParameters::default(), 1, TransactionUrgency::Low, vec![]).unwrap();
-        let tx2 = Transaction::new(TransactionParameters::default(), 2, TransactionUrgency::Medium, vec![]).unwrap();
-        let tx3 = Transaction::new(TransactionParameters::default(), 3, TransactionUrgency::High, vec![]).unwrap();
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 1, TransactionUrgency::Low, vec![]);
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 2, TransactionUrgency::Medium, vec![]);
+        let msg3 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 3, TransactionUrgency::High, vec![]);
 
-        queue.push(tx1.clone());
-        queue.push(tx2.clone());
-        queue.push(tx3.clone());
+        queue.push(msg1);
+        queue.push(msg2);
+        queue.push(msg3);
 
         assert_eq!(queue.len(), 3);
         assert!(!queue.is_empty());
 
-        // Transactions should come out in order of priority
+        // Messages should come out in order of priority
         assert_eq!(queue.pop().unwrap().priority, 3);
         assert_eq!(queue.pop().unwrap().priority, 2);
         assert_eq!(queue.pop().unwrap().priority, 1);
@@ -95,21 +96,21 @@ mod tests {
     }
 
     #[test]
-    fn test_prioritized_transaction_ordering() {
-        let tx1 = Transaction::new(TransactionParameters::default(), 1, TransactionUrgency::Low, vec![]).unwrap();
-        let tx2 = Transaction::new(TransactionParameters::default(), 2, TransactionUrgency::Medium, vec![]).unwrap();
+    fn test_prioritized_message_ordering() {
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 1, TransactionUrgency::Low, vec![]);
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), Bytes::default(), None, None, None, 2, TransactionUrgency::Medium, vec![]);
 
-        let pt1 = PrioritizedTransaction {
-            transaction: tx1,
+        let pm1 = PrioritizedMessage {
+            message: msg1,
             effective_priority: 1,
         };
 
-        let pt2 = PrioritizedTransaction {
-            transaction: tx2,
+        let pm2 = PrioritizedMessage {
+            message: msg2,
             effective_priority: 2,
         };
 
-        assert!(pt1 > pt2); // Remember, we want a max-heap, so higher priority should be "greater"
-        assert_eq!(pt1.cmp(&pt2), Ordering::Greater);
+        assert!(pm1 > pm2); // Remember, we want a max-heap, so higher priority should be "greater"
+        assert_eq!(pm1.cmp(&pm2), Ordering::Greater);
     }
 }

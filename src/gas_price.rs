@@ -15,13 +15,6 @@ pub enum CongestionLevel {
     High,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum TransactionUrgency {
-    Low,
-    Medium,
-    High,
-}
-
 pub struct GasPriceManager {
     confirmation_times: Mutex<VecDeque<Duration>>,
     priority_fee: Mutex<U256>,
@@ -35,13 +28,13 @@ impl GasPriceManager {
         }
     }
 
-    pub async fn get_gas_price(&self, urgency: TransactionUrgency) -> Result<(U256, U256)> {
+    pub async fn get_gas_price(&self, priority: u32) -> Result<(U256, U256)> {
         let base_fee = self.estimate_base_fee().await;
-        let priority_fee = self.calculate_priority_fee(urgency).await;
+        let priority_fee = self.calculate_priority_fee(priority).await;
         Ok((base_fee, priority_fee))
     }
 
-    async fn calculate_priority_fee(&self, urgency: TransactionUrgency) -> U256 {
+    async fn calculate_priority_fee(&self, priority: u32) -> U256 {
         let base_priority_fee = *self.priority_fee.lock().await;
         let congestion = self.analyze_network_congestion().await;
 
@@ -51,13 +44,9 @@ impl GasPriceManager {
             CongestionLevel::High => 3,
         };
 
-        let urgency_multiplier = match urgency {
-            TransactionUrgency::Low => 1,
-            TransactionUrgency::Medium => 2,
-            TransactionUrgency::High => 3,
-        };
+        let priority_multiplier = priority.min(10) as u64; // Cap priority influence
 
-        let fee: U256 = base_priority_fee * congestion_multiplier * urgency_multiplier;
+        let fee: U256 = base_priority_fee * congestion_multiplier * priority_multiplier;
         fee.min(MAX_PRIORITY_FEE)
     }
 

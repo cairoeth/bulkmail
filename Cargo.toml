@@ -27,7 +27,7 @@ mockall = "0.11"
 
 [[bin]]
 name = "happychain"
-path = "src/bin/happychain.rs"
+path = "src/bin/tm.rs"
 
 [lib]
 name = "happychain"
