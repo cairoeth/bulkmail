@@ -1,8 +1,7 @@
-use std::collections::VecDeque;
+use crate::Error;
+use std::{collections::VecDeque, time::Duration};
 use tokio::sync::Mutex;
 use web3::types::U256;
-use std::time::Duration;
-use crate::Error;
 
 const MAX_PRIORITY: u32 = 10;
 const MAX_PRIORITY_FEE: U256 = U256([100_000_000_000, 0, 0, 0]); // 100 Gwei
@@ -77,7 +76,8 @@ impl GasPriceManager {
             return CongestionLevel::Medium;
         }
 
-        let avg_time = confirmation_times.iter().sum::<Duration>() / confirmation_times.len() as u32;
+        let avg_time =
+            confirmation_times.iter().sum::<Duration>() / confirmation_times.len() as u32;
 
         if avg_time < CONGESTION_THRESHOLD_LOW {
             CongestionLevel::Low
@@ -89,7 +89,11 @@ impl GasPriceManager {
     }
 
     /// Updates the gas price manager based on the confirmation time and used priority fee
-    pub async fn update_on_confirmation(&self, confirmation_time: Duration, used_priority_fee: U256) {
+    pub async fn update_on_confirmation(
+        &self,
+        confirmation_time: Duration,
+        used_priority_fee: U256,
+    ) {
         let mut confirmation_times = self.confirmation_times.lock().await;
         confirmation_times.push_back(confirmation_time);
         if confirmation_times.len() > CONFIRMATION_TIME_WINDOW {
@@ -150,19 +154,25 @@ mod tests {
 
         // Test low congestion
         for _ in 0..10 {
-            manager.update_on_confirmation(Duration::from_secs(10), U256::from(1_000_000_000)).await;
+            manager
+                .update_on_confirmation(Duration::from_secs(10), U256::from(1_000_000_000))
+                .await;
         }
         let (_, priority_fee_low) = manager.get_gas_price(1).await.unwrap();
 
         // Test medium congestion
         for _ in 0..10 {
-            manager.update_on_confirmation(Duration::from_secs(30), U256::from(1_000_000_000)).await;
+            manager
+                .update_on_confirmation(Duration::from_secs(30), U256::from(1_000_000_000))
+                .await;
         }
         let (_, priority_fee_medium) = manager.get_gas_price(1).await.unwrap();
 
         // Test high congestion
         for _ in 0..10 {
-            manager.update_on_confirmation(Duration::from_secs(70), U256::from(1_000_000_000)).await;
+            manager
+                .update_on_confirmation(Duration::from_secs(70), U256::from(1_000_000_000))
+                .await;
         }
         let (_, priority_fee_high) = manager.get_gas_price(1).await.unwrap();
 
@@ -175,7 +185,9 @@ mod tests {
         let manager = GasPriceManager::new();
         let initial_priority_fee = *manager.priority_fee.lock().await;
 
-        manager.update_on_confirmation(Duration::from_secs(30), U256::from(2_000_000_000)).await;
+        manager
+            .update_on_confirmation(Duration::from_secs(30), U256::from(2_000_000_000))
+            .await;
 
         let updated_priority_fee = *manager.priority_fee.lock().await;
         assert!(updated_priority_fee > initial_priority_fee);
@@ -186,12 +198,17 @@ mod tests {
         let manager = GasPriceManager::new();
 
         for i in 0..=CONFIRMATION_TIME_WINDOW {
-            manager.update_on_confirmation(Duration::from_secs(i as u64), U256::from(1_000_000_000)).await;
+            manager
+                .update_on_confirmation(Duration::from_secs(i as u64), U256::from(1_000_000_000))
+                .await;
         }
 
         let confirmation_times = manager.confirmation_times.lock().await;
         assert_eq!(confirmation_times.len(), CONFIRMATION_TIME_WINDOW);
         assert_eq!(confirmation_times.front(), Some(&Duration::from_secs(1)));
-        assert_eq!(confirmation_times.back(), Some(&Duration::from_secs(CONFIRMATION_TIME_WINDOW as u64)));
+        assert_eq!(
+            confirmation_times.back(),
+            Some(&Duration::from_secs(CONFIRMATION_TIME_WINDOW as u64))
+        );
     }
 }

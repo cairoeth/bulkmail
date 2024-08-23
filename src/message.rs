@@ -1,7 +1,7 @@
-use std::time::Instant;
-use chrono::{DateTime, Utc};
-use web3::types::{Address, Bytes, H256, U256};
 use crate::{Error, BLOCK_TIME, MAX_DEPENDENCIES, MAX_RETRIES, POINTS_PER_BLOCK};
+use chrono::{DateTime, Utc};
+use std::time::Instant;
+use web3::types::{Address, Bytes, H256, U256};
 
 #[derive(Debug, Clone)]
 pub struct Message {
@@ -56,7 +56,7 @@ impl Message {
         let deadline_factor = match self.deadline_factor() {
             None => 0,
             Some(0) => return 0,
-            Some(x) => x
+            Some(x) => x,
         };
 
         let age = self.created_at.elapsed().as_secs() as u32;
@@ -74,7 +74,7 @@ impl Message {
             Some(deadline) => {
                 let now = Utc::now();
                 if deadline <= now {
-                    return Some(0)
+                    return Some(0);
                 }
 
                 let time_left = deadline - now;
@@ -112,8 +112,8 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use crate::MAX_DEPENDENCIES;
     use super::*;
+    use crate::MAX_DEPENDENCIES;
 
     #[test]
     fn test_new_message() {
@@ -125,7 +125,8 @@ mod tests {
         let priority = 1;
         let dependencies = vec![H256::zero()];
         let deadline = None;
-        let message = Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+        let message =
+            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert_eq!(message.priority, 1);
         assert_eq!(message.dependencies.len(), 1);
@@ -158,7 +159,8 @@ mod tests {
         let priority = 1;
         let dependencies = vec![];
         let deadline = None;
-        let mut message = Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+        let mut message =
+            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert_eq!(message.effective_priority(), 1);
 
@@ -181,7 +183,8 @@ mod tests {
         let priority = 1;
         let dependencies = vec![];
         let deadline = None;
-        let mut message = Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+        let mut message =
+            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert!(message.can_retry());
 

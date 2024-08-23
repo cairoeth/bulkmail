@@ -1,10 +1,14 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
+use crate::{Error, GasPriceManager, Message, PriorityQueue, BLOCK_TIME};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::sync::{Mutex, Semaphore};
-use web3::types::{TransactionReceipt, TransactionRequest, H256, U256, U64};
-use web3::{Transport, Web3};
-use crate::{Message, PriorityQueue, GasPriceManager, Error, BLOCK_TIME};
+use web3::{
+    types::{TransactionReceipt, TransactionRequest, H256, U256, U64},
+    Transport, Web3,
+};
 
 const MAX_IN_FLIGHT_TRANSACTIONS: usize = 16;
 const MAX_REPLACEMENTS: u32 = 3;
@@ -52,7 +56,10 @@ impl<T: Transport + Send + Sync> Sender<T> {
         Ok(())
     }
 
-    pub async fn run(&self) -> Result<(), Error> where <T as Transport>::Out: Send {
+    pub async fn run(&self) -> Result<(), Error>
+    where
+        <T as Transport>::Out: Send,
+    {
         let mut interval = tokio::time::interval(REPLACEMENT_INTERVAL);
 
         loop {
@@ -65,7 +72,10 @@ impl<T: Transport + Send + Sync> Sender<T> {
         }
     }
 
-    async fn process_next_message(&self) where <T as Transport>::Out: Send {
+    async fn process_next_message(&self)
+    where
+        <T as Transport>::Out: Send,
+    {
         let permit = self.max_in_flight.clone().acquire_owned().await.unwrap();
 
         if let Some(msg) = self.queue.lock().await.pop() {
@@ -87,7 +97,10 @@ impl<T: Transport + Send + Sync> Sender<T> {
         }
     }
 
-    async fn process_message(&self, mut msg: Message) -> Result<(), Error> where <T as Transport>::Out: Send {
+    async fn process_message(&self, mut msg: Message) -> Result<(), Error>
+    where
+        <T as Transport>::Out: Send,
+    {
         // Check deadline
         if msg.is_expired() {
             return Err(Error::MessageExpired);
@@ -156,14 +169,17 @@ impl<T: Transport + Send + Sync> Sender<T> {
 
         // Add to pending
         let gas_price = base_fee + priority_fee;
-        self.pending.lock().await.insert(tx_hash, PendingTransaction {
-            message: msg,
-            created_at: Instant::now(),
-            replacement_count: 0,
-            last_replacement_time: Instant::now(),
-            current_gas_price: gas_price,
-            nonce,
-        });
+        self.pending.lock().await.insert(
+            tx_hash,
+            PendingTransaction {
+                message: msg,
+                created_at: Instant::now(),
+                replacement_count: 0,
+                last_replacement_time: Instant::now(),
+                current_gas_price: gas_price,
+                nonce,
+            },
+        );
 
         // Spawn a new task to wait for confirmation
         let pending = self.pending.clone();
@@ -202,7 +218,11 @@ impl<T: Transport + Send + Sync> Sender<T> {
         }
     }
 
-    async fn replace_transaction(&self, tx_hash: H256, mut pending_tx: PendingTransaction) -> Result<(), Error> {
+    async fn replace_transaction(
+        &self,
+        tx_hash: H256,
+        mut pending_tx: PendingTransaction,
+    ) -> Result<(), Error> {
         let base_fee = self.gas_price_manager.get_base_fee().await;
         let current_gas_price = pending_tx.current_gas_price.max(base_fee);
         let new_gas_price = current_gas_price * 110 / 100;
@@ -248,11 +268,11 @@ async fn wait_for_confirmation<T>(
     pending: SharedPendingMap,
     gas_price_manager: Arc<GasPriceManager>,
     queue: SharedQueue,
-    tx_hash: H256
+    tx_hash: H256,
 ) where
     T: Transport + Send + Sync + 'static,
 {
-    match eth.transaction_receipt(tx_hash).await    {
+    match eth.transaction_receipt(tx_hash).await {
         Ok(Some(receipt)) => {
             handle_transaction_receipt(pending, gas_price_manager, queue, tx_hash, receipt).await;
         }
@@ -272,13 +292,18 @@ async fn handle_transaction_receipt(
     gas_price_manager: Arc<GasPriceManager>,
     queue: SharedQueue,
     tx_hash: H256,
-    receipt: TransactionReceipt
+    receipt: TransactionReceipt,
 ) {
     if receipt.status == Some(1.into()) {
         println!("Transaction {:?} confirmed", tx_hash);
         if let Some(pending_tx) = pending.lock().await.remove(&tx_hash) {
             let confirmation_time = pending_tx.created_at.elapsed();
-            gas_price_manager.update_on_confirmation(confirmation_time, receipt.effective_gas_price.unwrap_or_default()).await;
+            gas_price_manager
+                .update_on_confirmation(
+                    confirmation_time,
+                    receipt.effective_gas_price.unwrap_or_default(),
+                )
+                .await;
         }
     } else {
         eprintln!("Transaction {:?} failed", tx_hash);
@@ -286,11 +311,7 @@ async fn handle_transaction_receipt(
     }
 }
 
-async fn handle_failed_transaction(
-    pending: SharedPendingMap,
-    queue: SharedQueue,
-    tx_hash: H256
-) {
+async fn handle_failed_transaction(pending: SharedPendingMap, queue: SharedQueue, tx_hash: H256) {
     let mut pending = pending.lock().await;
     if let Some(mut pending_tx) = pending.remove(&tx_hash) {
         pending_tx.message.increment_retry();
@@ -300,21 +321,25 @@ async fn handle_failed_transaction(
             drop(pending);
             queue.lock().await.push(pending_tx.message);
         } else {
-            eprintln!("Message for transaction {:?} failed after max retries", tx_hash);
+            eprintln!(
+                "Message for transaction {:?} failed after max retries",
+                tx_hash
+            );
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
     use super::*;
+    use jsonrpc_core::{Call, Id, MethodCall, Params, Version};
     use mockall::predicate::*;
     use serde_json::Value;
-    use web3::types::{H256, U256, Address};
-    use web3::futures::Future;
-    use std::pin::Pin;
-    use jsonrpc_core::{Call, Id, MethodCall, Params, Version};
+    use std::{collections::VecDeque, pin::Pin};
+    use web3::{
+        futures::Future,
+        types::{Address, H256, U256},
+    };
 
     #[derive(Clone, Debug)]
     struct MockTransport {
@@ -349,7 +374,11 @@ mod tests {
         fn send(&self, _id: web3::RequestId, _request: Call) -> Self::Out {
             let send_responses = self.send_responses.clone();
             Box::pin(async move {
-                let a = send_responses.lock().await.pop_front().unwrap_or(Err(web3::Error::Internal));
+                let a = send_responses
+                    .lock()
+                    .await
+                    .pop_front()
+                    .unwrap_or(Err(web3::Error::Internal));
                 a
             })
         }
@@ -386,8 +415,16 @@ mod tests {
     #[tokio::test]
     async fn test_process_message() {
         let mock_transport = MockTransport::new();
-        mock_transport.add_response(Ok(Value::String("0x1111111111111111111111111111111111111111111111111111111111111111".to_string()))).await;
-        mock_transport.add_response(Ok(Value::String("0x2222222222222222222222222222222222222222222222222222222222222222".to_string()))).await;
+        mock_transport
+            .add_response(Ok(Value::String(
+                "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+            )))
+            .await;
+        mock_transport
+            .add_response(Ok(Value::String(
+                "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+            )))
+            .await;
         let sender = Sender::new(mock_transport).await.unwrap();
 
         let message = create_test_message();
@@ -402,21 +439,33 @@ mod tests {
     async fn test_check_stuck_transactions() {
         // Create sender with mock client
         let mock_transport = MockTransport::new();
-        mock_transport.add_response(Ok(Value::String("0x1111111111111111111111111111111111111111111111111111111111111111".to_string()))).await; // first send_transaction
-        mock_transport.add_response(Ok(Value::String("0x2222222222222222222222222222222222222222222222222222222222222222".to_string()))).await; // replacement send_transaction
+        mock_transport
+            .add_response(Ok(Value::String(
+                "0x1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+            )))
+            .await; // first send_transaction
+        mock_transport
+            .add_response(Ok(Value::String(
+                "0x2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+            )))
+            .await; // replacement send_transaction
         let sender = Sender::new(mock_transport).await.unwrap();
 
         // Add a stuck transaction
         {
             let tx_hash = H256::random();
-            sender.pending.lock().await.insert(tx_hash,  PendingTransaction {
-                message: create_test_message(),
-                created_at: Instant::now(),
-                replacement_count: 0,
-                last_replacement_time: Instant::now() - Duration::from_secs(REPLACEMENT_INTERVAL.as_secs() + 1),
-                current_gas_price: U256::from(1_000_000_000),
-                nonce: U256::zero(),
-            });
+            sender.pending.lock().await.insert(
+                tx_hash,
+                PendingTransaction {
+                    message: create_test_message(),
+                    created_at: Instant::now(),
+                    replacement_count: 0,
+                    last_replacement_time: Instant::now()
+                        - Duration::from_secs(REPLACEMENT_INTERVAL.as_secs() + 1),
+                    current_gas_price: U256::from(1_000_000_000),
+                    nonce: U256::zero(),
+                },
+            );
         }
 
         // Run check_stuck_transactions

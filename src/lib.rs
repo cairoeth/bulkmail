@@ -1,16 +1,16 @@
 use thiserror::Error;
 use web3::types::Address;
 
-pub mod priority_queue;
-pub mod sender;
 pub mod gas_price;
 pub mod message;
+pub mod priority_queue;
+pub mod sender;
 
 // Re-export main components for easier use
-pub use priority_queue::PriorityQueue;
-pub use sender::Sender;
 pub use gas_price::GasPriceManager;
 pub use message::Message;
+pub use priority_queue::PriorityQueue;
+pub use sender::Sender;
 
 pub const SENDER_ADDRESS: Address = Address::zero(); // Replace with actual address in production
 

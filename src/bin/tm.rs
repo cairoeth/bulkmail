@@ -1,6 +1,5 @@
-use happychain::{Sender, Message, Error};
-use web3::transports::Http;
-use web3::types::{U256};
+use happychain::{Error, Message, Sender};
+use web3::{transports::Http, types::U256};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {

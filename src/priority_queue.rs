@@ -1,6 +1,5 @@
 use crate::message::Message;
-use std::cmp::Ordering;
-use std::collections::BinaryHeap;
+use std::{cmp::Ordering, collections::BinaryHeap};
 
 #[derive(Debug)]
 pub struct PriorityQueue {
@@ -44,7 +43,10 @@ impl PriorityQueue {
 
     pub fn push(&mut self, message: Message) {
         let effective_priority = message.effective_priority();
-        self.heap.push(PrioritizedMessage { message, effective_priority });
+        self.heap.push(PrioritizedMessage {
+            message,
+            effective_priority,
+        });
     }
 
     pub fn pop(&mut self) -> Option<Message> {
@@ -68,17 +70,44 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Error, Message};
     use super::*;
+    use crate::{Error, Message};
     use web3::types::{Address, U256};
 
     #[test]
     fn test_priority_queue() -> Result<(), Error> {
         let mut queue = PriorityQueue::new();
 
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![], None)?;
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![], None)?;
-        let msg3 = Message::new(Address::zero(), None, U256::zero(), None, None, 3,  vec![], None)?;
+        let msg1 = Message::new(
+            Address::zero(),
+            None,
+            U256::zero(),
+            None,
+            None,
+            1,
+            vec![],
+            None,
+        )?;
+        let msg2 = Message::new(
+            Address::zero(),
+            None,
+            U256::zero(),
+            None,
+            None,
+            2,
+            vec![],
+            None,
+        )?;
+        let msg3 = Message::new(
+            Address::zero(),
+            None,
+            U256::zero(),
+            None,
+            None,
+            3,
+            vec![],
+            None,
+        )?;
 
         queue.push(msg1);
         queue.push(msg2);
@@ -98,8 +127,26 @@ mod tests {
 
     #[test]
     fn test_prioritized_message_ordering() -> Result<(), Error> {
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![], None)?;
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![], None)?;
+        let msg1 = Message::new(
+            Address::zero(),
+            None,
+            U256::zero(),
+            None,
+            None,
+            1,
+            vec![],
+            None,
+        )?;
+        let msg2 = Message::new(
+            Address::zero(),
+            None,
+            U256::zero(),
+            None,
+            None,
+            2,
+            vec![],
+            None,
+        )?;
 
         let pm1 = PrioritizedMessage {
             message: msg1,
