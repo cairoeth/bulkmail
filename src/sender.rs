@@ -1,20 +1,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
+use std::time::Instant;
+use tokio::sync::{Mutex, Semaphore};
 use web3::types::{TransactionReceipt, TransactionRequest, H256, U256, U64};
 use web3::{Transport, Web3};
 use crate::{Result, Message, PriorityQueue, GasPriceManager};
 
-pub struct Sender<T: Transport> {
+const MAX_IN_FLIGHT_TRANSACTIONS: usize = 16;
+
+#[derive(Clone)]
+pub struct Sender<T: Transport + Send + 'static> {
     web3: Web3<T>,
     queue: Arc<Mutex<PriorityQueue>>,
     pending: Arc<Mutex<HashMap<H256, (Message, Instant)>>>,
     nonce: Arc<Mutex<U256>>,
     gas_price_manager: Arc<GasPriceManager>,
+    max_in_flight: Arc<Semaphore>,
 }
 
-impl<T: Transport> Sender<T> {
+impl<T: Transport + Send + Sync> Sender<T> {
     pub async fn new(transport: T) -> Result<Self> {
         let web3 = Web3::new(transport);
         Ok(Self {
@@ -23,6 +27,7 @@ impl<T: Transport> Sender<T> {
             pending: Arc::new(Mutex::new(HashMap::new())),
             nonce: Arc::new(Mutex::new(U256::zero())), // We'll set this properly when sending
             gas_price_manager: Arc::new(GasPriceManager::new()),
+            max_in_flight: Arc::new(Semaphore::new(MAX_IN_FLIGHT_TRANSACTIONS)),
         })
     }
 
@@ -31,19 +36,28 @@ impl<T: Transport> Sender<T> {
         Ok(())
     }
 
-    pub async fn run(&self) -> Result<()> {
+    pub async fn run(&self) -> Result<()> where <T as Transport>::Out: Send {
         loop {
+            // Acquire a permit before processing a message
+            let _permit = self.max_in_flight.clone().acquire_owned().await.unwrap();
+
+            // Try to get a message from the queue
             if let Some(msg) = self.queue.lock().await.pop() {
+                // Process the message directly
                 if let Err(e) = self.process_message(msg).await {
                     eprintln!("Error processing message: {:?}", e);
                 }
-            } else {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                // The permit is dropped here, releasing it back to the semaphore
+                continue;
             }
+
+            // If there are no messages, release the permit and yield to the scheduler
+            drop(_permit);
+            tokio::task::yield_now().await;
         }
     }
 
-    async fn process_message(&self, mut msg: Message) -> Result<()> {
+    async fn process_message(&self, mut msg: Message) -> Result<()> where <T as Transport>::Out: Send {
         // Check dependencies
         {
             let pending = self.pending.lock().await;
@@ -108,50 +122,79 @@ impl<T: Transport> Sender<T> {
         // Add to pending
         self.pending.lock().await.insert(tx_hash, (msg, Instant::now()));
 
-        // Wait for confirmation
-        self.wait_for_confirmation(tx_hash).await;
+        // Spawn a new task to wait for confirmation
+        let pending = self.pending.clone();
+        let gas_price_manager = self.gas_price_manager.clone();
+        let queue = self.queue.clone();
+        let eth = self.web3.eth().clone();
+
+        tokio::spawn(async move {
+            wait_for_confirmation(eth, pending, gas_price_manager, queue, tx_hash).await;
+        });
+
 
         Ok(())
     }
+}
 
-    async fn wait_for_confirmation(&self, tx_hash: H256) {
-        match self.web3.eth().transaction_receipt(tx_hash).await {
-            Ok(Some(receipt)) => {
-                self.handle_transaction_receipt(tx_hash, receipt).await;
-            }
-            Ok(None) => {
-                eprintln!("Transaction {:?} receipt not found", tx_hash);
-            }
-            Err(e) => {
-                eprintln!("Error waiting for transaction {:?}: {:?}", tx_hash, e);
-                self.handle_failed_transaction(tx_hash).await;
-            }
+async fn wait_for_confirmation<T: Transport>(
+    eth: web3::api::Eth<T>,
+    pending: Arc<Mutex<HashMap<H256, (Message, Instant)>>>,
+    gas_price_manager: Arc<GasPriceManager>,
+    queue: Arc<Mutex<PriorityQueue>>,
+    tx_hash: H256
+) where
+    T: Send + Sync + 'static,
+{
+    match eth.transaction_receipt(tx_hash).await {
+        Ok(Some(receipt)) => {
+            handle_transaction_receipt(pending, gas_price_manager, queue, tx_hash, receipt).await;
+        }
+        Ok(None) => {
+            eprintln!("Transaction {:?} receipt not found", tx_hash);
+            handle_failed_transaction(pending, queue, tx_hash).await;
+        }
+        Err(e) => {
+            eprintln!("Error waiting for transaction {:?}: {:?}", tx_hash, e);
+            handle_failed_transaction(pending, queue, tx_hash).await;
         }
     }
+}
 
-    async fn handle_transaction_receipt(&self, tx_hash: H256, receipt: TransactionReceipt) {
-        if receipt.status == Some(1.into()) {
-            println!("Transaction {:?} confirmed", tx_hash);
-            if let Some((_, start_time)) = self.pending.lock().await.remove(&tx_hash) {
-                let confirmation_time = start_time.elapsed();
-                self.gas_price_manager.update_on_confirmation(confirmation_time, receipt.effective_gas_price.unwrap_or_default()).await;
-            }
+async fn handle_transaction_receipt(
+    pending: Arc<Mutex<HashMap<H256, (Message, Instant)>>>,
+    gas_price_manager: Arc<GasPriceManager>,
+    queue: Arc<Mutex<PriorityQueue>>,
+    tx_hash: H256,
+    receipt: TransactionReceipt
+) {
+    if receipt.status == Some(1.into()) {
+        println!("Transaction {:?} confirmed", tx_hash);
+        if let Some((_, start_time)) = pending.lock().await.remove(&tx_hash) {
+            let confirmation_time = start_time.elapsed();
+            gas_price_manager.update_on_confirmation(confirmation_time, receipt.effective_gas_price.unwrap_or_default()).await;
+        }
+    } else {
+        eprintln!("Transaction {:?} failed", tx_hash);
+        handle_failed_transaction(pending, queue, tx_hash).await;
+    }
+}
+
+async fn handle_failed_transaction(
+    pending: Arc<Mutex<HashMap<H256, (Message, Instant)>>>,
+    queue: Arc<Mutex<PriorityQueue>>,
+    tx_hash: H256
+) {
+    let mut pending = pending.lock().await;
+    if let Some((mut msg, _)) = pending.remove(&tx_hash) {
+        msg.increment_retry();
+        if msg.can_retry() {
+            // Increase priority and push back to queue
+            msg.priority = msg.priority.saturating_add(1);
+            drop(pending);
+            queue.lock().await.push(msg);
         } else {
-            eprintln!("Transaction {:?} failed", tx_hash);
-            self.handle_failed_transaction(tx_hash).await;
-        }
-    }
-
-    async fn handle_failed_transaction(&self, tx_hash: H256) {
-        let mut pending = self.pending.lock().await;
-        if let Some((mut msg, _)) = pending.remove(&tx_hash) {
-            msg.increment_retry();
-            if msg.can_retry() {
-                drop(pending);
-                self.queue.lock().await.push(msg);
-            } else {
-                eprintln!("Message {:?} failed after max retries", tx_hash);
-            }
+            eprintln!("Message {:?} failed after max retries", tx_hash);
         }
     }
 }
