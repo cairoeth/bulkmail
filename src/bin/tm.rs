@@ -1,9 +1,9 @@
-use happychain::{Result, Sender, Message};
+use happychain::{Sender, Message, Error};
 use web3::transports::Http;
 use web3::types::{U256};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Error> {
     let transport = Http::new("http://localhost:8545")?;
     let web3 = web3::Web3::new(transport);
     let accounts = web3.eth().accounts().await?;
@@ -17,6 +17,7 @@ async fn main() -> Result<()> {
         None,
         1,
         vec![],
+        None,
     )?;
 
     sender.add_message(msg1).await?;

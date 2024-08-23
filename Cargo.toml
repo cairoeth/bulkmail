@@ -23,7 +23,9 @@ thiserror = "1.0.63"
 
 [dev-dependencies]
 tokio-test = "0.4"
-mockall = "0.11"
+tokio = { version = "1.39", features = ["full", "test-util"] }
+mockall = "0.13"
+jsonrpc-core = "18"
 
 [[bin]]
 name = "happychain"

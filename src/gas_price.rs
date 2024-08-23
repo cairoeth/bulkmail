@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use tokio::sync::Mutex;
 use web3::types::U256;
 use std::time::Duration;
-use crate::Result;
+use crate::Error;
 
 const MAX_PRIORITY: u32 = 10;
 const MAX_PRIORITY_FEE: U256 = U256([100_000_000_000, 0, 0, 0]); // 100 Gwei
@@ -47,7 +47,7 @@ impl GasPriceManager {
     }
 
     /// Returns the estimated gas price based on network congestion and user priority
-    pub async fn get_gas_price(&self, priority: u32) -> Result<(U256, U256)> {
+    pub async fn get_gas_price(&self, priority: u32) -> Result<(U256, U256), Error> {
         let base_fee = self.get_base_fee().await;
         let priority_fee = self.calculate_priority_fee(priority).await;
         Ok((base_fee, priority_fee))
@@ -103,7 +103,7 @@ impl GasPriceManager {
 
     /// Returns the base fee of the next block
     /// Mock implementation - replace with actual base fee estimation logic
-    async fn get_base_fee(&self) -> U256 {
+    pub(crate) async fn get_base_fee(&self) -> U256 {
         INITIAL_BASE_FEE
     }
 }

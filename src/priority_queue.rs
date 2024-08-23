@@ -76,9 +76,9 @@ mod tests {
     fn test_priority_queue() -> Result<(), Error> {
         let mut queue = PriorityQueue::new();
 
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![])?;
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![])?;
-        let msg3 = Message::new(Address::zero(), None, U256::zero(), None, None, 3,  vec![])?;
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![], None)?;
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![], None)?;
+        let msg3 = Message::new(Address::zero(), None, U256::zero(), None, None, 3,  vec![], None)?;
 
         queue.push(msg1);
         queue.push(msg2);
@@ -98,8 +98,8 @@ mod tests {
 
     #[test]
     fn test_prioritized_message_ordering() -> Result<(), Error> {
-        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![])?;
-        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![])?;
+        let msg1 = Message::new(Address::zero(), None, U256::zero(), None, None, 1,vec![], None)?;
+        let msg2 = Message::new(Address::zero(), None, U256::zero(), None, None, 2, vec![], None)?;
 
         let pm1 = PrioritizedMessage {
             message: msg1,
