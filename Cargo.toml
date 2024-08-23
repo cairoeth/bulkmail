@@ -1,5 +1,5 @@
 [package]
-name = "happychain"
+name = "transaction-manager"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tyler Smith <mail@tcry.pt>"]
