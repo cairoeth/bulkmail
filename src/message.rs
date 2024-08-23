@@ -20,6 +20,7 @@ pub struct Message {
 }
 
 impl Message {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         from: Address,
         to: Option<Address>,

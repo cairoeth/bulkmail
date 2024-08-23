@@ -21,9 +21,9 @@ pub enum CongestionLevel {
     High,
 }
 
-impl Into<i32> for CongestionLevel {
-    fn into(self) -> i32 {
-        match self {
+impl From<CongestionLevel> for i32 {
+    fn from(level: CongestionLevel) -> i32 {
+        match level {
             CongestionLevel::Low => 1,
             CongestionLevel::Medium => 2,
             CongestionLevel::High => 3,

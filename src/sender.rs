@@ -125,7 +125,7 @@ impl<T: Transport + Send + Sync> Sender<T> {
             to: msg.to,
             gas: Some(msg.gas),
             value: msg.value,
-            data: msg.data.clone().map(|data| data.clone()),
+            data: msg.data.clone(),
 
             // Late-bound transaction params
             nonce: Some(nonce),
@@ -243,14 +243,14 @@ impl<T: Transport + Send + Sync> Sender<T> {
     }
 }
 
-async fn wait_for_confirmation<T: Transport>(
+async fn wait_for_confirmation<T>(
     eth: web3::api::Eth<T>,
     pending: SharedPendingMap,
     gas_price_manager: Arc<GasPriceManager>,
     queue: SharedQueue,
     tx_hash: H256
 ) where
-    T: Send + Sync + 'static,
+    T: Transport + Send + Sync + 'static,
 {
     match eth.transaction_receipt(tx_hash).await    {
         Ok(Some(receipt)) => {
