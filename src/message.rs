@@ -2,7 +2,7 @@ use std::time::Instant;
 use web3::types::{Address, Bytes, H256, U256};
 use crate::{Error, Result, MAX_DEPENDENCIES, MAX_RETRIES};
 
-const BLOCK_TIME: u32 = 12; // In seconds
+const BLOCK_TIME: u32 = 2; // In seconds
 const POINTS_PER_BLOCK: u32 = 1;
 
 #[derive(Debug, Clone)]
