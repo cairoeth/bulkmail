@@ -6,7 +6,7 @@ use std::{
 };
 use tokio::sync::{Mutex, Semaphore};
 use web3::{
-    types::{TransactionReceipt, TransactionRequest, H256, U256, U64, CallRequest},
+    types::{CallRequest, TransactionReceipt, TransactionRequest, H256, U256, U64},
     Transport, Web3,
 };
 
@@ -21,11 +21,10 @@ type SharedQueue = Arc<Mutex<PriorityQueue>>;
 
 #[derive(Clone)]
 struct PendingTransaction {
-    message: Message,
+    msg: Message,
     created_at: Instant,
     replacement_count: u32,
-    last_replacement_time: Instant,
-    current_gas_price: U256,
+    gas_price: U256,
     nonce: U256,
 }
 
@@ -98,7 +97,7 @@ impl<T: Transport + Send + Sync> Sender<T> {
         }
     }
 
-    async fn process_message(&self, mut msg: Message) -> Result<(), Error>
+    async fn process_message(&self, msg: Message) -> Result<(), Error>
     where
         <T as Transport>::Out: Send,
     {
@@ -120,7 +119,7 @@ impl<T: Transport + Send + Sync> Sender<T> {
             }
         }
 
-        // Set nonce
+        // Determine next nonce
         let nonce = {
             let mut nonce = self.nonce.lock().await;
             *nonce = self.web3.eth().transaction_count(msg.from, None).await?;
@@ -132,50 +131,8 @@ impl<T: Transport + Send + Sync> Sender<T> {
         // Get current initial gas price
         let (base_fee, priority_fee) = self.gas_price_manager.get_gas_price(msg.priority).await?;
 
-        // Create TransactionRequest
-        let tx_request = self.build_transaction_request(&msg, nonce, base_fee, priority_fee).await?;
-
         // Send transaction
-        let tx_hash = match self.web3.eth().send_transaction(tx_request).await {
-            Ok(hash) => hash,
-            Err(e) => {
-                // Handle error (e.g., low gas price)
-                // TODO: Differentiate errors and handle accordingly
-                // TODO: Abstract this into a function shared with replace_transaction
-                msg.increment_retry();
-                if msg.can_retry() {
-                    self.queue.lock().await.push(msg);
-                } else {
-                    eprintln!("Message failed after max retries: {:?}", e);
-                }
-                return Ok(());
-            }
-        };
-
-        // Add to pending
-        let gas_price = base_fee + priority_fee;
-        self.pending.lock().await.insert(
-            tx_hash,
-            PendingTransaction {
-                message: msg,
-                created_at: Instant::now(),
-                replacement_count: 0,
-                last_replacement_time: Instant::now(),
-                current_gas_price: gas_price,
-                nonce,
-            },
-        );
-
-        // Spawn a new task to wait for confirmation
-        let pending = self.pending.clone();
-        let gas_price_manager = self.gas_price_manager.clone();
-        let queue = self.queue.clone();
-        let eth = self.web3.eth().clone();
-        tokio::spawn(async move {
-            wait_for_confirmation(eth, pending, gas_price_manager, queue, tx_hash).await;
-        });
-
-        Ok(())
+        self.send_transaction(msg, nonce, base_fee, priority_fee, 0).await
     }
 
     async fn simulate_transaction(&self, tx: &TransactionRequest) -> Result<U256, Error> {
@@ -195,14 +152,70 @@ impl<T: Transport + Send + Sync> Sender<T> {
         }, None).await?)
     }
 
-    async fn check_stuck_transactions(&self) {
+    async fn send_transaction(
+        &self,
+        mut msg: Message,
+        nonce: U256,
+        base_fee: U256,
+        priority_fee: U256,
+        replacement_count: u32,
+    ) -> Result<(), Error>
+    where
+        <T as Transport>::Out: Send,
+    {
+        // Create TransactionRequest
+        let tx_request = self.build_transaction_request(&msg, nonce, base_fee, priority_fee).await?;
+
+        // Send transaction
+        let tx_hash = match self.web3.eth().send_transaction(tx_request).await {
+            Ok(hash) => hash,
+            Err(e) => {
+                // Handle error (e.g., low gas price)
+                msg.increment_retry();
+                if msg.can_retry() {
+                    self.queue.lock().await.push(msg);
+                } else {
+                    eprintln!("Message failed after max retries: {:?}", e);
+                }
+                return Err(Error::Web3Error(e));
+            }
+        };
+
+        // Add to pending
+        let gas_price = base_fee + priority_fee;
+        let pending_tx = PendingTransaction {
+            msg,
+            nonce,
+            gas_price,
+            replacement_count,
+            created_at: Instant::now(),
+        };
+
+        self.pending.lock().await.insert(tx_hash, pending_tx.clone());
+
+        // Spawn a new task to wait for confirmation
+        let pending = self.pending.clone();
+        let gas_price_manager = self.gas_price_manager.clone();
+        let queue = self.queue.clone();
+        let eth = self.web3.eth().clone();
+        tokio::spawn(async move {
+            wait_for_confirmation(eth, pending, gas_price_manager, queue, tx_hash).await;
+        });
+
+        Ok(())
+    }
+
+    async fn check_stuck_transactions(&self)
+    where
+        <T as Transport>::Out: Send,
+    {
         let now = Instant::now();
         let transactions_to_replace = {
             let pending = self.pending.lock().await;
             pending
                 .iter()
                 .filter_map(|(tx_hash, info)| {
-                    if now.duration_since(info.last_replacement_time) > REPLACEMENT_INTERVAL
+                    if now.duration_since(info.created_at) > REPLACEMENT_INTERVAL
                         && info.replacement_count < MAX_REPLACEMENTS
                     {
                         Some((*tx_hash, info.clone()))
@@ -223,35 +236,27 @@ impl<T: Transport + Send + Sync> Sender<T> {
     async fn replace_transaction(
         &self,
         tx_hash: H256,
-        mut pending_tx: PendingTransaction,
-    ) -> Result<(), Error> {
+        pending_tx: PendingTransaction,
+    ) -> Result<(), Error> where
+        <T as Transport>::Out: Send,
+    {
         let base_fee = self.gas_price_manager.get_base_fee().await;
-        let current_gas_price = pending_tx.current_gas_price.max(base_fee);
-        let new_gas_price = current_gas_price * 110 / 100;
+        let current_gas_price = pending_tx.gas_price.max(base_fee);
+        let new_gas_price = percent_change(current_gas_price, 110);
         let new_priority_fee = new_gas_price - base_fee;
 
-        // Create a new transaction with the same details but higher gas price
-        let new_tx = self.build_transaction_request(
-            &pending_tx.message,
+        // Remove the old transaction from pending
+        self.pending.lock().await.remove(&tx_hash);
+
+        // Send the new transaction
+        self.send_transaction(
+            pending_tx.msg,
             pending_tx.nonce,
             base_fee,
             new_priority_fee,
-        ).await?;
-
-        // Send the new transaction
-        let new_hash = self.web3.eth().send_transaction(new_tx).await?;
-
-        // Update the pending transaction
-        pending_tx.replacement_count += 1;
-        pending_tx.last_replacement_time = Instant::now();
-        pending_tx.current_gas_price = new_gas_price;
-
-        // Update the pending transactions map
-        let mut pending = self.pending.lock().await;
-        pending.remove(&tx_hash);
-        pending.insert(new_hash, pending_tx);
-
-        Ok(())
+            pending_tx.replacement_count + 1,
+        )
+            .await
     }
 
     async fn build_transaction_request(
@@ -282,7 +287,7 @@ impl<T: Transport + Send + Sync> Sender<T> {
                 // Simulate transaction to get gas used
                 let gas = self.simulate_transaction(&tx).await?;
                 percent_change(gas, 120)
-            },
+            }
         });
 
         Ok(tx)
@@ -345,12 +350,12 @@ async fn handle_transaction_receipt(
 async fn handle_failed_transaction(pending: SharedPendingMap, queue: SharedQueue, tx_hash: H256) {
     let mut pending = pending.lock().await;
     if let Some(mut pending_tx) = pending.remove(&tx_hash) {
-        pending_tx.message.increment_retry();
-        if pending_tx.message.can_retry() {
+        pending_tx.msg.increment_retry();
+        if pending_tx.msg.can_retry() {
             // Increase priority and push back to queue
-            pending_tx.message.priority = pending_tx.message.priority.saturating_add(1);
+            pending_tx.msg.priority = pending_tx.msg.priority.saturating_add(1);
             drop(pending);
-            queue.lock().await.push(pending_tx.message);
+            queue.lock().await.push(pending_tx.msg);
         } else {
             eprintln!(
                 "Message for transaction {:?} failed after max retries",
@@ -390,7 +395,7 @@ mod tests {
     }
 
     impl Transport for MockTransport {
-        type Out = Pin<Box<dyn Future<Output = Result<Value, web3::Error>> + Send>>;
+        type Out = Pin<Box<dyn Future<Output=Result<Value, web3::Error>> + Send>>;
 
         fn prepare(&self, _method: &str, _params: Vec<Value>) -> (web3::RequestId, Call) {
             let m = MethodCall {
@@ -422,7 +427,7 @@ mod tests {
             to: Some(Address::zero()),
             value: Some(U256::from(1000)),
             data: None,
-            gas: U256::from(21_000),
+            gas: Some(U256::from(21_000)),
             priority: 1,
             dependencies: vec![],
             deadline: None,
@@ -488,12 +493,12 @@ mod tests {
             sender.pending.lock().await.insert(
                 tx_hash,
                 PendingTransaction {
-                    message: create_test_message(),
+                    msg: create_test_message(),
                     created_at: Instant::now(),
                     replacement_count: 0,
                     last_replacement_time: Instant::now()
                         - Duration::from_secs(REPLACEMENT_INTERVAL.as_secs() + 1),
-                    current_gas_price: U256::from(1_000_000_000),
+                    gas_price: U256::from(1_000_000_000),
                     nonce: U256::zero(),
                 },
             );
@@ -507,6 +512,6 @@ mod tests {
         assert_eq!(pending.len(), 1);
         let replaced_tx = pending.values().next().unwrap();
         assert_eq!(replaced_tx.replacement_count, 1);
-        assert!(replaced_tx.current_gas_price > U256::from(1_000_000_000));
+        assert!(replaced_tx.gas_price > U256::from(1_000_000_000));
     }
 }
