@@ -1,18 +1,18 @@
+use std::fmt::Display;
 use crate::{Error, BLOCK_TIME, MAX_DEPENDENCIES, MAX_RETRIES, POINTS_PER_BLOCK};
 use chrono::{DateTime, Utc};
 use std::time::Instant;
-use web3::types::{Address, Bytes, H256, U256};
+use alloy::primitives::{Address, Bytes, B256, U256};
 
 #[derive(Debug, Clone)]
 pub struct Message {
-    pub from: Address,
     pub to: Option<Address>,
+    pub value: U256,
+    pub data: Bytes,
+    pub gas: u128,
 
-    pub gas: Option<U256>,
-    pub value: Option<U256>,
-    pub data: Option<Bytes>,
     pub priority: u32,
-    pub dependencies: Vec<H256>,
+    pub dependencies: Vec<B256>,
     pub deadline: Option<DateTime<Utc>>,
 
     pub created_at: Instant,
@@ -22,20 +22,18 @@ pub struct Message {
 impl Message {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        from: Address,
         to: Option<Address>,
-        gas: Option<U256>,
-        value: Option<U256>,
-        data: Option<Bytes>,
+        gas: u128,
+        value: U256,
+        data: Bytes,
         priority: u32,
-        dependencies: Vec<H256>,
+        dependencies: Vec<B256>,
         deadline: Option<DateTime<Utc>>,
     ) -> Result<Self, Error> {
         if dependencies.len() > MAX_DEPENDENCIES {
             return Err(Error::TooManyDependencies(dependencies.len()));
         }
         Ok(Self {
-            from,
             to,
             gas,
             value,
@@ -43,8 +41,7 @@ impl Message {
             priority,
             dependencies,
             deadline,
-            created_at: Instant::now(),
-            retry_count: 0,
+            ..Default::default()
         })
     }
 
@@ -93,8 +90,9 @@ impl Message {
         }
     }
 
-    pub fn increment_retry(&mut self) {
+    pub fn increment_retry(&mut self) -> bool {
         self.retry_count = self.retry_count.saturating_add(1);
+        self.can_retry()
     }
 
     pub fn can_retry(&self) -> bool {
@@ -110,6 +108,30 @@ impl Message {
     }
 }
 
+impl Default for Message{
+    fn default() -> Self {
+        Self{
+            to: None,
+            value: Default::default(),
+            data: Default::default(),
+            gas: 0,
+            priority: 0,
+            dependencies: vec![],
+            deadline: None,
+            created_at: Instant::now(),
+            retry_count: 0,
+        }
+    }
+
+}
+
+impl Display for Message {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Message {{ to: {:?}, value: {}, gas: {}, priority: {}, dependencies: {:?}, deadline: {:?}, created_at: {:?}, retry_count: {} }}",
+            self.to, self.value, self.gas, self.priority, self.dependencies, self.deadline, self.created_at, self.retry_count)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,16 +139,15 @@ mod tests {
 
     #[test]
     fn test_new_message() {
-        let from = Address::zero();
-        let to = Some(Address::zero());
-        let gas = Some(U256::from(21_000));
-        let value = Some(U256::zero());
-        let data = None;
+        let to = Some(Address::default());
+        let gas = 21_000u128;
+        let value = U256::from(0);
+        let data = Bytes::default();
         let priority = 1;
-        let dependencies = vec![H256::zero()];
+        let dependencies = vec![B256::default()];
         let deadline = None;
         let message =
-            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+            Message::new(to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert_eq!(message.priority, 1);
         assert_eq!(message.dependencies.len(), 1);
@@ -135,32 +156,30 @@ mod tests {
 
     #[test]
     fn test_too_many_dependencies() {
-        let from = Address::zero();
-        let to = Some(Address::zero());
-        let gas = Some(U256::from(21_000));
-        let value = Some(U256::zero());
-        let data = None;
+        let to = Some(Address::default());
+        let gas = 21_000u128;
+        let value = U256::from(0);
+        let data = Bytes::default();
         let priority = 1;
-        let dependencies = vec![H256::zero(); MAX_DEPENDENCIES + 1];
+        let dependencies = vec![B256::default(); MAX_DEPENDENCIES + 1];
         let deadline = None;
         assert!(matches!(
-            Message::new(from, to, gas, value, data, priority, dependencies, deadline),
+            Message::new(to, gas, value, data, priority, dependencies, deadline),
             Err(Error::TooManyDependencies(_))
         ));
     }
 
     #[test]
     fn test_effective_priority() {
-        let from = Address::zero();
-        let to = Some(Address::zero());
-        let gas = Some(U256::from(21_000));
-        let value = Some(U256::zero());
-        let data = None;
+        let to = Some(Address::default());
+        let gas = 21_000u128;
+        let value = U256::from(0);
+        let data = Bytes::default();
         let priority = 1;
         let dependencies = vec![];
         let deadline = None;
         let mut message =
-            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+            Message::new(to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert_eq!(message.effective_priority(), 1);
 
@@ -175,16 +194,15 @@ mod tests {
 
     #[test]
     fn test_can_retry() {
-        let from = Address::zero();
-        let to = Some(Address::zero());
-        let gas = Some(U256::from(21_000));
-        let value = Some(U256::zero());
-        let data = None;
+        let to = Some(Address::default());
+        let gas = 21_000u128;
+        let value = U256::from(0);
+        let data = Bytes::default();
         let priority = 1;
         let dependencies = vec![];
         let deadline = None;
         let mut message =
-            Message::new(from, to, gas, value, data, priority, dependencies, deadline).unwrap();
+            Message::new(to, gas, value, data, priority, dependencies, deadline).unwrap();
 
         assert!(message.can_retry());
 

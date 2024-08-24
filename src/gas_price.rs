@@ -1,12 +1,11 @@
 use crate::Error;
 use std::{collections::VecDeque, time::Duration};
 use tokio::sync::Mutex;
-use web3::types::U256;
 
 const MAX_PRIORITY: u32 = 10;
-const MAX_PRIORITY_FEE: U256 = U256([100_000_000_000, 0, 0, 0]); // 100 Gwei
-const INITIAL_PRIORITY_FEE: U256 = U256([1_000_000_000, 0, 0, 0]); // 1 Gwei
-const INITIAL_BASE_FEE: U256 = U256([2_000_000_000, 0, 0, 0]); // 2 Gwei
+const MAX_PRIORITY_FEE: u128 = 100_000_000_000; // 100 Gwei
+const INITIAL_PRIORITY_FEE: u128 = 1_000_000_000; // 1 Gwei
+const INITIAL_BASE_FEE: u128 = 2_000_000_000; // 2 Gwei
 
 const CONFIRMATION_TIME_WINDOW: usize = 10;
 const CONGESTION_THRESHOLD_LOW: Duration = Duration::from_secs(15);
@@ -20,8 +19,8 @@ pub enum CongestionLevel {
     High,
 }
 
-impl From<CongestionLevel> for i32 {
-    fn from(level: CongestionLevel) -> i32 {
+impl From<CongestionLevel> for u128 {
+    fn from(level: CongestionLevel) -> u128 {
         match level {
             CongestionLevel::Low => 1,
             CongestionLevel::Medium => 2,
@@ -33,7 +32,7 @@ impl From<CongestionLevel> for i32 {
 /// Manages gas prices based on network congestion and user priority
 pub struct GasPriceManager {
     confirmation_times: Mutex<VecDeque<Duration>>,
-    priority_fee: Mutex<U256>,
+    priority_fee: Mutex<u128>,
 }
 
 impl GasPriceManager {
@@ -46,26 +45,26 @@ impl GasPriceManager {
     }
 
     /// Returns the estimated gas price based on network congestion and user priority
-    pub async fn get_gas_price(&self, priority: u32) -> Result<(U256, U256), Error> {
+    pub async fn get_gas_price(&self, priority: u32) -> Result<(u128, u128), Error> {
         let base_fee = self.get_base_fee().await;
         let priority_fee = self.calculate_priority_fee(priority).await;
         Ok((base_fee, priority_fee))
     }
 
     /// Calculates the priority fee based on network congestion and user priority
-    async fn calculate_priority_fee(&self, priority: u32) -> U256 {
+    async fn calculate_priority_fee(&self, priority: u32) -> u128 {
         // Base priority is the minimum we want to use as a priority fee
         let base_priority_fee = *self.priority_fee.lock().await;
 
         // Get network congestion influence
         let congestion = self.analyze_network_congestion().await;
-        let congestion_multiplier: i32 = congestion.into();
+        let congestion_multiplier: u128 = congestion.into();
 
         // Get a capped priority influence
-        let priority_multiplier = priority.min(MAX_PRIORITY) as u64;
+        let priority_multiplier: u128 = priority.min(MAX_PRIORITY).into();
 
         // Calculate the priority fee to use for this transaction
-        let fee: U256 = base_priority_fee * congestion_multiplier * priority_multiplier;
+        let fee: u128 = base_priority_fee * congestion_multiplier * priority_multiplier;
         fee.min(MAX_PRIORITY_FEE)
     }
 
@@ -92,7 +91,7 @@ impl GasPriceManager {
     pub async fn update_on_confirmation(
         &self,
         confirmation_time: Duration,
-        used_priority_fee: U256,
+        used_priority_fee: u128,
     ) {
         let mut confirmation_times = self.confirmation_times.lock().await;
         confirmation_times.push_back(confirmation_time);
@@ -107,7 +106,7 @@ impl GasPriceManager {
 
     /// Returns the base fee of the next block
     /// Mock implementation - replace with actual base fee estimation logic
-    pub(crate) async fn get_base_fee(&self) -> U256 {
+    pub(crate) async fn get_base_fee(&self) -> u128 {
         INITIAL_BASE_FEE
     }
 }
@@ -130,7 +129,7 @@ mod tests {
         assert_eq!(base_fee, INITIAL_BASE_FEE);
 
         // 2 Gwei (initial priority fee * initial congestion)
-        assert_eq!(priority_fee, U256::from(2_000_000_000));
+        assert_eq!(priority_fee, 2_000_000_000);
     }
 
     #[test]
@@ -155,7 +154,7 @@ mod tests {
         // Test low congestion
         for _ in 0..10 {
             manager
-                .update_on_confirmation(Duration::from_secs(10), U256::from(1_000_000_000))
+                .update_on_confirmation(Duration::from_secs(10), 1_000_000_000)
                 .await;
         }
         let (_, priority_fee_low) = manager.get_gas_price(1).await.unwrap();
@@ -163,7 +162,7 @@ mod tests {
         // Test medium congestion
         for _ in 0..10 {
             manager
-                .update_on_confirmation(Duration::from_secs(30), U256::from(1_000_000_000))
+                .update_on_confirmation(Duration::from_secs(30), 1_000_000_000)
                 .await;
         }
         let (_, priority_fee_medium) = manager.get_gas_price(1).await.unwrap();
@@ -171,7 +170,7 @@ mod tests {
         // Test high congestion
         for _ in 0..10 {
             manager
-                .update_on_confirmation(Duration::from_secs(70), U256::from(1_000_000_000))
+                .update_on_confirmation(Duration::from_secs(70),1_000_000_000)
                 .await;
         }
         let (_, priority_fee_high) = manager.get_gas_price(1).await.unwrap();
@@ -186,7 +185,7 @@ mod tests {
         let initial_priority_fee = *manager.priority_fee.lock().await;
 
         manager
-            .update_on_confirmation(Duration::from_secs(30), U256::from(2_000_000_000))
+            .update_on_confirmation(Duration::from_secs(30), 2_000_000_000)
             .await;
 
         let updated_priority_fee = *manager.priority_fee.lock().await;
@@ -199,7 +198,7 @@ mod tests {
 
         for i in 0..=CONFIRMATION_TIME_WINDOW {
             manager
-                .update_on_confirmation(Duration::from_secs(i as u64), U256::from(1_000_000_000))
+                .update_on_confirmation(Duration::from_secs(i as u64), 1_000_000_000)
                 .await;
         }
 

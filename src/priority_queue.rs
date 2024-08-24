@@ -70,40 +70,37 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
+    use alloy::primitives::{Address, Bytes, U256};
     use super::*;
     use crate::{Error, Message};
-    use web3::types::{Address, U256};
 
     #[test]
     fn test_priority_queue() -> Result<(), Error> {
         let mut queue = PriorityQueue::new();
 
         let msg1 = Message::new(
-            Address::zero(),
-            None,
-            U256::zero(),
-            None,
-            None,
+            Some(Address::default()),
+            0,
+            U256::from(0),
+            Bytes::default(),
             1,
             vec![],
             None,
         )?;
         let msg2 = Message::new(
-            Address::zero(),
-            None,
-            U256::zero(),
-            None,
-            None,
+            Some(Address::default()),
+            0,
+            U256::from(0),
+            Bytes::default(),
             2,
             vec![],
             None,
         )?;
         let msg3 = Message::new(
-            Address::zero(),
-            None,
-            U256::zero(),
-            None,
-            None,
+            Some(Address::default()),
+            0,
+            U256::from(0),
+            Bytes::default(),
             3,
             vec![],
             None,
@@ -127,26 +124,14 @@ mod tests {
 
     #[test]
     fn test_prioritized_message_ordering() -> Result<(), Error> {
-        let msg1 = Message::new(
-            Address::zero(),
-            None,
-            U256::zero(),
-            None,
-            None,
-            1,
-            vec![],
-            None,
-        )?;
-        let msg2 = Message::new(
-            Address::zero(),
-            None,
-            U256::zero(),
-            None,
-            None,
-            2,
-            vec![],
-            None,
-        )?;
+        let msg1 = Message{
+            priority: 1,
+            ..Default::default()
+        };
+        let msg2 = Message{
+            priority: 2,
+            ..Default::default()
+        };
 
         let pm1 = PrioritizedMessage {
             message: msg1,
