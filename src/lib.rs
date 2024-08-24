@@ -34,4 +34,6 @@ pub enum Error {
     RetriesExceeded,
     #[error("Gas price too low")]
     GasPriceTooLow,
+    #[error("Simulation failed")]
+    SimulationFailed,
 }

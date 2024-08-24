@@ -11,7 +11,7 @@ async fn main() -> Result<(), Error> {
     let msg1 = Message::new(
         accounts[0],
         Some(accounts[1]),
-        U256::from(21_000u64),
+        Some(U256::from(21_000u64)),
         Some(U256::from(1_000_000_000_000_000_000u64)), // 1 ETH
         None,
         1,

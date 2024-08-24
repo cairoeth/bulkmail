@@ -6,13 +6,14 @@ use std::{
 };
 use tokio::sync::{Mutex, Semaphore};
 use web3::{
-    types::{TransactionReceipt, TransactionRequest, H256, U256, U64},
+    types::{TransactionReceipt, TransactionRequest, H256, U256, U64, CallRequest},
     Transport, Web3,
 };
 
 const MAX_IN_FLIGHT_TRANSACTIONS: usize = 16;
 const MAX_REPLACEMENTS: u32 = 3;
 const REPLACEMENT_INTERVAL: Duration = Duration::from_secs((BLOCK_TIME * 5) as u64);
+const SIMULATION_GAS_LIMIT: u32 = 1_000_000;
 
 type PendingMap = HashMap<H256, PendingTransaction>;
 type SharedPendingMap = Arc<Mutex<PendingMap>>;
@@ -128,35 +129,19 @@ impl<T: Transport + Send + Sync> Sender<T> {
             current_nonce
         };
 
-        // Set gas price
+        // Get current initial gas price
         let (base_fee, priority_fee) = self.gas_price_manager.get_gas_price(msg.priority).await?;
 
         // Create TransactionRequest
-        let tx_request = TransactionRequest {
-            // Message data
-            from: msg.from,
-            to: msg.to,
-            gas: Some(msg.gas),
-            value: msg.value,
-            data: msg.data.clone(),
-
-            // Late-bound transaction params
-            nonce: Some(nonce),
-            max_fee_per_gas: Some(base_fee + priority_fee),
-            max_priority_fee_per_gas: Some(priority_fee),
-
-            // Static transaction params
-            gas_price: None,
-            condition: None,
-            access_list: None,
-            transaction_type: Some(U64::from(2)),
-        };
+        let tx_request = self.build_transaction_request(&msg, nonce, base_fee, priority_fee).await?;
 
         // Send transaction
         let tx_hash = match self.web3.eth().send_transaction(tx_request).await {
             Ok(hash) => hash,
             Err(e) => {
                 // Handle error (e.g., low gas price)
+                // TODO: Differentiate errors and handle accordingly
+                // TODO: Abstract this into a function shared with replace_transaction
                 msg.increment_retry();
                 if msg.can_retry() {
                     self.queue.lock().await.push(msg);
@@ -191,6 +176,23 @@ impl<T: Transport + Send + Sync> Sender<T> {
         });
 
         Ok(())
+    }
+
+    async fn simulate_transaction(&self, tx: &TransactionRequest) -> Result<U256, Error> {
+        Ok(self.web3.eth().estimate_gas(CallRequest {
+            from: Some(tx.from),
+            to: tx.to,
+            value: tx.value,
+            data: tx.data.clone(),
+
+            gas: Some(U256::from(SIMULATION_GAS_LIMIT)),
+            gas_price: tx.gas_price,
+            max_fee_per_gas: tx.max_fee_per_gas,
+            max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
+
+            transaction_type: tx.transaction_type,
+            ..Default::default()
+        }, None).await?)
     }
 
     async fn check_stuck_transactions(&self) {
@@ -229,22 +231,12 @@ impl<T: Transport + Send + Sync> Sender<T> {
         let new_priority_fee = new_gas_price - base_fee;
 
         // Create a new transaction with the same details but higher gas price
-        let msg = &pending_tx.message;
-        let new_tx = TransactionRequest {
-            from: msg.from,
-            to: msg.to,
-            value: msg.value,
-            gas: Some(msg.gas),
-            data: msg.data.clone(),
-
-            nonce: Some(pending_tx.nonce),
-            max_fee_per_gas: Some(new_gas_price),
-            max_priority_fee_per_gas: Some(new_priority_fee),
-
-            gas_price: None,
-            transaction_type: Some(U64::from(2)),
-            ..Default::default()
-        };
+        let new_tx = self.build_transaction_request(
+            &pending_tx.message,
+            pending_tx.nonce,
+            base_fee,
+            new_priority_fee,
+        ).await?;
 
         // Send the new transaction
         let new_hash = self.web3.eth().send_transaction(new_tx).await?;
@@ -261,7 +253,46 @@ impl<T: Transport + Send + Sync> Sender<T> {
 
         Ok(())
     }
+
+    async fn build_transaction_request(
+        &self,
+        msg: &Message,
+        nonce: U256,
+        base_fee: U256,
+        priority_fee: U256,
+    ) -> Result<TransactionRequest, Error> {
+        let mut tx = TransactionRequest {
+            from: msg.from,
+            to: msg.to,
+            value: msg.value,
+            data: msg.data.clone(),
+
+            gas: None, // We'll set this below
+            nonce: Some(nonce),
+            max_fee_per_gas: Some(base_fee + priority_fee),
+            max_priority_fee_per_gas: Some(priority_fee),
+
+            transaction_type: Some(U64::from(2)),
+            ..Default::default()
+        };
+
+        tx.gas = Some(match msg.gas {
+            Some(g) => g,
+            None => {
+                // Simulate transaction to get gas used
+                let gas = self.simulate_transaction(&tx).await?;
+                percent_change(gas, 120)
+            },
+        });
+
+        Ok(tx)
+    }
 }
+
+fn percent_change(n: U256, percent: u8) -> U256 {
+    n * U256::from(percent) / U256::from(100)
+}
+
 
 async fn wait_for_confirmation<T>(
     eth: web3::api::Eth<T>,

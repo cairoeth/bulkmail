@@ -8,7 +8,7 @@ pub struct Message {
     pub from: Address,
     pub to: Option<Address>,
 
-    pub gas: U256,
+    pub gas: Option<U256>,
     pub value: Option<U256>,
     pub data: Option<Bytes>,
     pub priority: u32,
@@ -24,7 +24,7 @@ impl Message {
     pub fn new(
         from: Address,
         to: Option<Address>,
-        gas: U256,
+        gas: Option<U256>,
         value: Option<U256>,
         data: Option<Bytes>,
         priority: u32,
@@ -119,7 +119,7 @@ mod tests {
     fn test_new_message() {
         let from = Address::zero();
         let to = Some(Address::zero());
-        let gas = U256::from(21_000);
+        let gas = Some(U256::from(21_000));
         let value = Some(U256::zero());
         let data = None;
         let priority = 1;
@@ -137,7 +137,7 @@ mod tests {
     fn test_too_many_dependencies() {
         let from = Address::zero();
         let to = Some(Address::zero());
-        let gas = U256::from(21_000);
+        let gas = Some(U256::from(21_000));
         let value = Some(U256::zero());
         let data = None;
         let priority = 1;
@@ -153,7 +153,7 @@ mod tests {
     fn test_effective_priority() {
         let from = Address::zero();
         let to = Some(Address::zero());
-        let gas = U256::from(21_000);
+        let gas = Some(U256::from(21_000));
         let value = Some(U256::zero());
         let data = None;
         let priority = 1;
@@ -177,7 +177,7 @@ mod tests {
     fn test_can_retry() {
         let from = Address::zero();
         let to = Some(Address::zero());
-        let gas = U256::from(21_000);
+        let gas = Some(U256::from(21_000));
         let value = Some(U256::zero());
         let data = None;
         let priority = 1;
