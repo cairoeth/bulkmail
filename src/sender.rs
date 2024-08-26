@@ -161,12 +161,6 @@ impl Sender {
             let watcher = self.chain.send_transaction(tx).await?;
             let tx_hash = *watcher.tx_hash();
 
-            // let stats = self.stats.get_mut();
-            // stats.total_sent += 1;
-            // if replacement_count > 0 {
-            //     stats.total_replaced += 1;
-            // }
-
             // Track the pending transaction
             self.pending.lock().await.insert(tx_hash, PendingTransaction {
                 msg,
