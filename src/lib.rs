@@ -18,7 +18,6 @@ pub use nonce_manager::NonceManager;
 
 pub const BLOCK_TIME: u32 = 2;
 pub const POINTS_PER_BLOCK: u32 = 1;
-pub const MAX_DEPENDENCIES: usize = 5;
 pub const MAX_RETRIES: u32 = 3;
 
 /// The main error type for the TM library

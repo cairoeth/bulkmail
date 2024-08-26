@@ -84,7 +84,6 @@ mod tests {
             U256::from(0),
             Bytes::default(),
             1,
-            vec![],
             None,
         )?;
         let msg2 = Message::new(
@@ -93,7 +92,6 @@ mod tests {
             U256::from(0),
             Bytes::default(),
             2,
-            vec![],
             None,
         )?;
         let msg3 = Message::new(
@@ -102,7 +100,6 @@ mod tests {
             U256::from(0),
             Bytes::default(),
             3,
-            vec![],
             None,
         )?;
 

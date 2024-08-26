@@ -117,18 +117,6 @@ impl Sender {
             return Err(Error::MessageExpired);
         }
 
-        // Check if any of the dependencies are still pending
-        // TODO: We also need to check the queue for dependencies
-        {
-            let pending = self.pending.lock().await;
-            for dep in &msg.dependencies {
-                if pending.contains_key(dep) {
-                    self.queue.lock().await.push(msg);
-                    return Ok(());
-                }
-            }
-        }
-
         // Get the next unscheduled nonce and initial gas prices
         let nonce = self.nonce_manager.get_next_available_nonce().await;
         let (base_fee, priority_fee) = self.gas_manager.get_gas_price(msg.priority).await?;
