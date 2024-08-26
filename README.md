@@ -1,5 +1,7 @@
 # Bulkmail
 
+![Build Status](https://github.com/tyler-smith/bulkmail/actions/workflows/ci.yml/badge.svg)
+
 A parallel transaction sender for Ethereum, designed to handle concurrent transaction sending to a rapid EVM blockchain.
 
 ## Docs
