@@ -1,5 +1,6 @@
 ## Sender
 
+```mermaid
 graph TD
     A[Message Added] -->|add_message| B[Queue]
     B -->|process_next_message| C{Available Slot?}
@@ -21,3 +22,4 @@ graph TD
     L --> Q[Update Gas and Nonce Trackers]
     M -->|No| R[Wait for Confirmation/Timeout]
     R --> K
+```
