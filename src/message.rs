@@ -151,7 +151,6 @@ mod tests {
         let value = U256::from(0);
         let data = Bytes::default();
         let priority = 1;
-        let dependencies = vec![];
         let deadline = None;
         let mut message =
             Message::new(to, gas, value, data, priority, deadline);
@@ -174,7 +173,6 @@ mod tests {
         let value = U256::from(0);
         let data = Bytes::default();
         let priority = 1;
-        let dependencies = vec![];
         let deadline = None;
         let mut message =
             Message::new(to, gas, value, data, priority, deadline);

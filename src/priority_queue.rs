@@ -70,7 +70,7 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::{Address, Bytes, U256};
+    use alloy::primitives::Address;
     use super::*;
     use crate::{Error, Message};
 
@@ -78,30 +78,22 @@ mod tests {
     fn test_priority_queue() -> Result<(), Error> {
         let mut queue = PriorityQueue::new();
 
-        let msg1 = Message::new(
-            Some(Address::default()),
-            0,
-            U256::from(0),
-            Bytes::default(),
-            1,
-            None,
-        )?;
-        let msg2 = Message::new(
-            Some(Address::default()),
-            0,
-            U256::from(0),
-            Bytes::default(),
-            2,
-            None,
-        )?;
-        let msg3 = Message::new(
-            Some(Address::default()),
-            0,
-            U256::from(0),
-            Bytes::default(),
-            3,
-            None,
-        )?;
+        let msg1 = Message {
+            to: Some(Address::default()),
+            ..Default::default()
+        };
+
+        let msg2 = Message {
+            to: Some(Address::default()),
+            priority: 1,
+            ..Default::default()
+        };
+
+        let msg3 = Message {
+            to: Some(Address::default()),
+            priority: 2,
+            ..Default::default()
+        };
 
         queue.push(msg1);
         queue.push(msg2);
@@ -111,11 +103,11 @@ mod tests {
         assert!(!queue.is_empty());
 
         // Messages should come out in order of priority
-        assert_eq!(queue.pop().unwrap().priority, 3);
         assert_eq!(queue.pop().unwrap().priority, 2);
         assert_eq!(queue.pop().unwrap().priority, 1);
-
+        assert_eq!(queue.pop().unwrap().priority, 0);
         assert!(queue.is_empty());
+
         Ok(())
     }
 
