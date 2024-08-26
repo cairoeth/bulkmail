@@ -1,8 +1,11 @@
 use std::fmt::Display;
-use crate::{BLOCK_TIME, MAX_RETRIES, POINTS_PER_BLOCK};
 use chrono::{DateTime, Utc};
 use std::time::Instant;
 use alloy::primitives::{Address, Bytes, U256};
+
+const BLOCK_TIME: u32 = 2;
+const POINTS_PER_BLOCK: u32 = 1;
+const MAX_RETRIES: u32 = 3;
 
 #[derive(Debug, Clone)]
 pub struct Message {

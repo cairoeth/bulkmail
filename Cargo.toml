@@ -1,9 +1,9 @@
 [package]
-name = "transaction-manager"
+name = "bulkmail"
 version = "0.1.0"
 edition = "2021"
 authors = ["Tyler Smith <mail@tcry.pt>"]
-description = "Transaction sending/management system"
+description = "Transaction sending system"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
@@ -21,7 +21,6 @@ hex = "0.4"
 thiserror = "1.0.63"
 secp256k1 = "0.20"
 ethereum-types = "0.12"
-#keccak256 = "0.1"
 alloy = { version = "0.2", features = ["full"] }
 alloy-node-bindings = "0.2.1"
 simple_logger = "5.0.0"
@@ -38,7 +37,7 @@ name = "oracle"
 path = "src/bin/oracle.rs"
 
 [lib]
-name = "happychain"
+name = "bulkmail"
 path = "src/lib.rs"
 
 [profile.release]

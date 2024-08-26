@@ -2,7 +2,7 @@ use crate::message::Message;
 use std::{cmp::Ordering, collections::BinaryHeap};
 
 #[derive(Debug)]
-pub struct PriorityQueue {
+pub(crate) struct PriorityQueue {
     heap: BinaryHeap<PrioritizedMessage>,
 }
 
@@ -53,10 +53,12 @@ impl PriorityQueue {
         self.heap.pop().map(|pm| pm.message)
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.heap.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.heap.len()
     }

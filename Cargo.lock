@@ -927,6 +927,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "bulkmail"
+version = "0.1.0"
+dependencies = [
+ "alloy",
+ "alloy-node-bindings",
+ "async-trait",
+ "chrono",
+ "dotenv",
+ "env_logger",
+ "ethereum-types",
+ "futures",
+ "hex",
+ "jsonrpc-core",
+ "log",
+ "mockall",
+ "rand",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "simple_logger",
+ "thiserror",
+ "tokio",
+ "tokio-test",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3424,32 +3450,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
-]
-
-[[package]]
-name = "transaction-manager"
-version = "0.1.0"
-dependencies = [
- "alloy",
- "alloy-node-bindings",
- "async-trait",
- "chrono",
- "dotenv",
- "env_logger",
- "ethereum-types",
- "futures",
- "hex",
- "jsonrpc-core",
- "log",
- "mockall",
- "rand",
- "secp256k1",
- "serde",
- "serde_json",
- "simple_logger",
- "thiserror",
- "tokio",
- "tokio-test",
 ]
 
 [[package]]

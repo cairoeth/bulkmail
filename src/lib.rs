@@ -1,30 +1,24 @@
 use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 
-pub mod gas_price;
 pub mod message;
-pub mod priority_queue;
 pub mod sender;
 pub mod chain;
+mod gas_price;
+mod priority_queue;
 mod nonce_manager;
 
 // Re-export main components for easier use
-pub use gas_price::GasPriceManager;
-pub use message::Message;
-pub use priority_queue::PriorityQueue;
-pub use sender::Sender;
 pub use chain::Chain;
-pub use nonce_manager::NonceManager;
-
-pub const BLOCK_TIME: u32 = 2;
-pub const POINTS_PER_BLOCK: u32 = 1;
-pub const MAX_RETRIES: u32 = 3;
+pub use sender::Sender;
+pub use message::Message;
+pub(crate) use gas_price::GasPriceManager;
+pub(crate) use nonce_manager::NonceManager;
+pub(crate) use priority_queue::PriorityQueue;
 
 /// The main error type for the TM library
 #[derive(Error, Debug)]
 pub enum Error {
-    // #[error("Web3 error: {0}")]
-    // Web3Error(#[from] web3::Error),
     #[error("rpc error: {0}")]
     RpcError(#[from] RpcError<TransportErrorKind>),
     #[error("signing error")]

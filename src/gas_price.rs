@@ -13,7 +13,7 @@ const CONGESTION_THRESHOLD_MEDIUM: Duration = Duration::from_secs(60);
 
 /// Network congestion levels for gas price calculation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CongestionLevel {
+enum CongestionLevel {
     Low,
     Medium,
     High,
@@ -30,7 +30,7 @@ impl From<CongestionLevel> for u128 {
 }
 
 /// Manages gas prices based on network congestion and user priority
-pub struct GasPriceManager {
+pub(crate) struct GasPriceManager {
     confirmation_times: Mutex<VecDeque<Duration>>,
     priority_fee: Mutex<u128>,
 }

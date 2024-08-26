@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use alloy::primitives::{Address, U256};
 use alloy_node_bindings::Anvil;
-use happychain::{Chain, Message, Sender};
+use bulkmail::{Chain, Message, Sender};
 use log::{error, info, LevelFilter};
+use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use simple_logger::SimpleLogger;
+use std::sync::Arc;
 use std::time::Duration;
-use rand::rngs::StdRng;
 use thiserror::Error;
 use tokio::time::sleep;
 
@@ -15,9 +15,9 @@ pub enum Error {
     #[error("hex decoding error: {0}")]
     HexDecode(#[from] hex::FromHexError),
     #[error("transaction manager error: {0}")]
-    TM(#[from] happychain::Error),
+    TM(#[from] bulkmail::Error),
     #[error("chain error: {0}")]
-    Chain(#[from] happychain::chain::Error),
+    Chain(#[from] bulkmail::chain::Error),
 }
 
 const CHAIN_ID: u64 = 1337;

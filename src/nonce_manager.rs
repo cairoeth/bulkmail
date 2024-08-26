@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use tokio::sync::Mutex;
 use alloy::primitives::Address;
 
-pub struct NonceManager {
+pub(crate) struct NonceManager {
     chain: Chain,
     address: Address,
     current_nonce: Mutex<u64>,

@@ -137,6 +137,7 @@ impl Sender {
     ) -> Result<(), Error> {
         Box::pin(async move {
             if replacement_count > MAX_REPLACEMENTS {
+                self.nonce_manager.mark_nonce_available(nonce).await;
                 return Err(Error::FeeIncreasesExceeded);
             }
 

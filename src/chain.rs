@@ -44,10 +44,6 @@ impl Chain {
         self.chain_id
     }
 
-    // pub fn height(&self) -> u64 {
-    //     0
-    // }
-
     /// Subscribe to new blocks
     pub async fn subscribe_new_blocks(&self) -> Result<Subscription<Block>, Error> {
         Ok(self.provider.subscribe_blocks().await?)
