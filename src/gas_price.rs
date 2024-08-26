@@ -130,7 +130,7 @@ mod tests {
     #[test]
     async fn test_initial_gas_price() {
         let manager = GasPriceManager::new();
-        let (base_fee, priority_fee) = manager.get_gas_price(1).await.unwrap();
+        let (base_fee, priority_fee) = manager.get_gas_price(0).await.unwrap();
         assert_eq!(base_fee, INITIAL_BASE_FEE);
 
         // 2 Gwei (initial priority fee * initial congestion)
@@ -148,8 +148,11 @@ mod tests {
     #[test]
     async fn test_max_priority_fee() {
         let manager = GasPriceManager::new();
-        let (_, priority_fee) = manager.get_gas_price(100).await.unwrap();
+        let (_, priority_fee) = manager.get_gas_price(MAX_PRIORITY).await.unwrap();
         assert!(priority_fee <= MAX_PRIORITY_FEE);
+
+        let (_, priority_fee2) = manager.get_gas_price(MAX_PRIORITY + 100).await.unwrap();
+        assert!(priority_fee == priority_fee2);
     }
 
     #[test]
