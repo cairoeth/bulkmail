@@ -1,8 +1,9 @@
-use std::fmt::Display;
-use chrono::{DateTime, Utc};
-use std::time::Instant;
 use alloy::primitives::{Address, Bytes, U256};
+use chrono::{DateTime, Utc};
+use std::fmt::Display;
+use std::time::Instant;
 
+pub(crate) const MAX_PRIORITY: u32 = 100;
 const BLOCK_TIME: u32 = 2;
 const POINTS_PER_BLOCK: u32 = 1;
 const MAX_RETRIES: u32 = 3;
@@ -75,13 +76,13 @@ impl Message {
                 let seconds_left = time_left.num_seconds() as u32;
                 if seconds_left < (BLOCK_TIME * 2) {
                     // Less than 2 blocks left, maximum priority boost
-                    Some(50)
+                    Some(MAX_PRIORITY)
                 } else if seconds_left < (BLOCK_TIME * 10) {
                     // Less than 10 blocks left, medium priority boost
-                    Some(10)
+                    Some(MAX_PRIORITY / 3)
                 } else {
-                    // More than 10 blocks left, low priority boost
-                    Some(2)
+                    // More than 10 blocks left, no priority boost
+                    None
                 }
             }
         }
@@ -105,9 +106,9 @@ impl Message {
     }
 }
 
-impl Default for Message{
+impl Default for Message {
     fn default() -> Self {
-        Self{
+        Self {
             to: None,
             value: Default::default(),
             data: Default::default(),
@@ -118,13 +119,12 @@ impl Default for Message{
             retry_count: 0,
         }
     }
-
 }
 
 impl Display for Message {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Message {{ to: {:?}, value: {}, gas: {}, priority: {}, deadline: {:?}, created_at: {:?}, retry_count: {} }}",
-            self.to, self.value, self.gas, self.priority, self.deadline, self.created_at, self.retry_count)
+               self.to, self.value, self.gas, self.priority, self.deadline, self.created_at, self.retry_count)
     }
 }
 

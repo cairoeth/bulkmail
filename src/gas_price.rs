@@ -1,8 +1,8 @@
 use crate::Error;
 use std::{collections::VecDeque, time::Duration};
 use tokio::sync::Mutex;
+use crate::message::MAX_PRIORITY;
 
-const MAX_PRIORITY: u32 = 10;
 const MAX_PRIORITY_FEE: u128 = 100_000_000_000; // 100 Gwei
 const INITIAL_PRIORITY_FEE: u128 = 1_000_000_000; // 1 Gwei
 const INITIAL_BASE_FEE: u128 = 2_000_000_000; // 2 Gwei
@@ -60,11 +60,12 @@ impl GasPriceManager {
         let congestion = self.analyze_network_congestion().await;
         let congestion_multiplier: u128 = congestion.into();
 
-        // Get a capped priority influence
-        let priority_multiplier: u128 = priority.min(MAX_PRIORITY).into();
+        // Get a priority multiplier from 100% to 200% based on the given priority
+        let priority_multiplier: u128 = 100 + percent(priority.min(MAX_PRIORITY), MAX_PRIORITY);
 
-        // Calculate the priority fee to use for this transaction
+        // Calculate the priority fee to use for this trans)action
         let fee: u128 = base_priority_fee * congestion_multiplier * priority_multiplier;
+        let fee = fee / 100;
         fee.min(MAX_PRIORITY_FEE)
     }
 
@@ -115,6 +116,10 @@ impl Default for GasPriceManager {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn percent(x: u32, y: u32) -> u128 {
+    ((x as f64 / y as f64) * 100.0) as u128
 }
 
 #[cfg(test)]

@@ -119,7 +119,7 @@ impl Sender {
 
         // Get the next unscheduled nonce and initial gas prices
         let nonce = self.nonce_manager.get_next_available_nonce().await;
-        let (base_fee, priority_fee) = self.gas_manager.get_gas_price(msg.priority).await?;
+        let (base_fee, priority_fee) = self.gas_manager.get_gas_price(msg.effective_priority()).await?;
 
         // Send transaction
         self.send_transaction(msg, nonce, base_fee, priority_fee, 0)
