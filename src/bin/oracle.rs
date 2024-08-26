@@ -21,13 +21,14 @@ pub enum Error {
 }
 
 const CHAIN_ID: u64 = 1337;
+const BLOCK_TIME: u64 = 1;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    SimpleLogger::new().with_level(LevelFilter::Debug).init().expect("Failed to initialize logger");
+    SimpleLogger::new().with_level(LevelFilter::Info).init().expect("Failed to initialize logger");
 
     // Start Anvil server
-    let anvil = match Anvil::new().block_time(2).chain_id(CHAIN_ID).try_spawn() {
+    let anvil = match Anvil::new().block_time(BLOCK_TIME).chain_id(CHAIN_ID).try_spawn() {
         Ok(a) => a,
         Err(e) => {
             error!("Anvil error: {}", e);
@@ -71,7 +72,7 @@ async fn continuous_send(addr: Address, sender: Arc<Sender>, chain: Chain) -> Re
         }).await;
 
         // Generate a random delay between 500ms and 1s
-        let delay = rng.gen_range(100..=500);
+        let delay = rng.gen_range(20..200);
         sleep(Duration::from_millis(delay)).await;
 
         // Print some status info

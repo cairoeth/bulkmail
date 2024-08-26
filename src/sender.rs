@@ -160,6 +160,7 @@ impl Sender {
             };
             let watcher = self.chain.send_transaction(tx).await?;
             let tx_hash = *watcher.tx_hash();
+            info!("Sent transaction {:?} with nonce {}", tx_hash, nonce);
 
             // Track the pending transaction
             self.pending.lock().await.insert(tx_hash, PendingTransaction {
