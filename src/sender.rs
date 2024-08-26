@@ -136,12 +136,19 @@ impl Sender {
         replacement_count: u32,
     ) -> Result<(), Error> {
         Box::pin(async move {
+            // Ensure the message is still valid
+            if msg.is_expired() {
+                self.nonce_manager.mark_nonce_available(nonce).await;
+                return Err(Error::MessageExpired);
+            }
+
+            // Ensure we haven't exceeded the maximum number of replacements
             if replacement_count > MAX_REPLACEMENTS {
                 self.nonce_manager.mark_nonce_available(nonce).await;
                 return Err(Error::FeeIncreasesExceeded);
             }
 
-            // Build and send the transaction
+            // Build the transaction
             let tx = TxEip1559 {
                 chain_id: self.chain.id(),
 
@@ -158,7 +165,17 @@ impl Sender {
 
                 access_list: Default::default(),
             };
-            let watcher = self.chain.send_transaction(tx).await?;
+
+            // Send the transaction and get a watcher
+            // If this fails, mark the nonce as available and return the error
+            let watcher = match self.chain.send_transaction(tx).await {
+                Ok(w) => w,
+                Err(e) => {
+                    self.nonce_manager.mark_nonce_available(nonce).await;
+                    return Err(Error::ChainError(e));
+                }
+            };
+
             let tx_hash = *watcher.tx_hash();
             info!("Sent transaction {:?} with nonce {}", tx_hash, nonce);
 
