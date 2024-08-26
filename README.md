@@ -2,6 +2,12 @@
 
 A parallel transaction sender for Ethereum, designed to handle concurrent transaction sending to a rapid EVM blockchain.
 
+## Docs
+
+- [Design](docs/design.md)
+- [Diagram](docs/diagrams.md)
+- [Problem Answers](docs/answers.md)
+
 ## Features
 
 - Handles sending transactions to a rapid EVM blockchain
