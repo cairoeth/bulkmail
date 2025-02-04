@@ -25,10 +25,17 @@ const BLOCK_TIME: u64 = 1;
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    SimpleLogger::new().with_level(LevelFilter::Info).init().expect("Failed to initialize logger");
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .init()
+        .expect("Failed to initialize logger");
 
     // Start Anvil server
-    let anvil = match Anvil::new().block_time(BLOCK_TIME).chain_id(CHAIN_ID).try_spawn() {
+    let anvil = match Anvil::new()
+        .block_time(BLOCK_TIME)
+        .chain_id(CHAIN_ID)
+        .try_spawn()
+    {
         Ok(a) => a,
         Err(e) => {
             error!("Anvil error: {}", e);
@@ -59,17 +66,18 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-
 async fn continuous_send(addr: Address, sender: Arc<Sender>, chain: Chain) -> Result<(), Error> {
     let mut rng = StdRng::from_entropy();
     loop {
         // Send a new message
-        sender.add_message(Message {
-            to: Some(Address::default()),
-            gas: 21_000u128,
-            value: U256::from(1_000_000u64), // 1 gwei
-            ..Default::default()
-        }).await;
+        sender
+            .add_message(Message {
+                to: Some(Address::default()),
+                gas: 21_000u64,
+                value: U256::from(1_000_000u64), // 1 gwei
+                ..Default::default()
+            })
+            .await;
 
         // Generate a random delay between 500ms and 1s
         let delay = rng.gen_range(20..200);

@@ -60,7 +60,11 @@ impl Sender {
     }
 
     pub async fn add_message(&self, msg: Message) {
-        debug!("adding message {} {}", msg.to.unwrap(), msg.value.to_string());
+        debug!(
+            "adding message {} {}",
+            msg.to.unwrap(),
+            msg.value.to_string()
+        );
         self.queue.lock().await.push(msg)
     }
 
@@ -76,7 +80,7 @@ impl Sender {
                         error!("Error receiving block notification: {:?}", e);
                         continue
                     }
-                    debug!("Received new block notification {}", block.unwrap().header.number.unwrap());
+                    debug!("Received new block notification {}", block.unwrap().number);
 
                     // Every block re-sync our nonce
                     self.nonce_manager.sync_nonce().await?
@@ -96,7 +100,9 @@ impl Sender {
             // We have a message, process it in a separate task
             let sender = self.clone();
             tokio::spawn(async move {
-                if let Err(Error::ChainError(chain::Error::Rpc(ErrorResp(e)))) = sender.process_message(msg).await {
+                if let Err(Error::ChainError(chain::Error::Rpc(ErrorResp(e)))) =
+                    sender.process_message(msg).await
+                {
                     if e.code == TX_FAILURE_INSUFFICIENT_FUNDS {
                         error!("Insufficient funds to send transaction; dropping message");
                     }
@@ -110,7 +116,11 @@ impl Sender {
     }
 
     async fn process_message(&self, msg: Message) -> Result<(), Error> {
-        debug!("processing message {} {}", msg.to.unwrap(), msg.value.to_string());
+        debug!(
+            "processing message {} {}",
+            msg.to.unwrap(),
+            msg.value.to_string()
+        );
 
         // First ensure the message is still valid
         if msg.is_expired() {
@@ -119,7 +129,10 @@ impl Sender {
 
         // Get the next unscheduled nonce and initial gas prices
         let nonce = self.nonce_manager.get_next_available_nonce().await;
-        let (base_fee, priority_fee) = self.gas_manager.get_gas_price(msg.effective_priority()).await?;
+        let (base_fee, priority_fee) = self
+            .gas_manager
+            .get_gas_price(msg.effective_priority())
+            .await?;
 
         // Send transaction
         self.send_transaction(msg, nonce, base_fee, priority_fee, 0)
@@ -180,20 +193,25 @@ impl Sender {
             info!("Sent transaction {:?} with nonce {}", tx_hash, nonce);
 
             // Track the pending transaction
-            self.pending.lock().await.insert(tx_hash, PendingTransaction {
-                msg,
-                nonce,
-                priority_fee,
-                replacement_count,
-                created_at: Instant::now(),
-            });
+            self.pending.lock().await.insert(
+                tx_hash,
+                PendingTransaction {
+                    msg,
+                    nonce,
+                    priority_fee,
+                    replacement_count,
+                    created_at: Instant::now(),
+                },
+            );
 
             // Watch the pending transaction for confirmation or timeout
             match self.watch_transaction(watcher).await {
                 Ok(_) => {
                     match self.chain.get_receipt(tx_hash).await {
                         // We got a receipt
-                        Ok(Some(receipt)) => self.handle_transaction_receipt(tx_hash, receipt).await,
+                        Ok(Some(receipt)) => {
+                            self.handle_transaction_receipt(tx_hash, receipt).await
+                        }
 
                         // We timed out
                         Ok(None) => self.handle_transaction_dropped(tx_hash).await,
@@ -212,25 +230,26 @@ impl Sender {
                 }
             };
             Ok(())
-        }).await
+        })
+        .await
     }
 
-    async fn watch_transaction<'a>(&self, watcher: PendingTransactionBuilder<'a, PubSubFrontend, Ethereum>) -> Result<TxHash, Error> {
+    async fn watch_transaction(
+        &self,
+        watcher: PendingTransactionBuilder<PubSubFrontend, Ethereum>,
+    ) -> Result<TxHash, Error> {
         // Configure the watcher
         let pending = watcher
             .with_required_confirmations(1)
             .with_timeout(Some(Duration::from_secs(TX_TIMEOUT)))
-            .register().await?;
+            .register()
+            .await;
 
         // Wait for the watcher to confirm or timeout
-        Ok(pending.await?)
+        Ok(*pending.unwrap().tx_hash())
     }
 
-    async fn handle_transaction_receipt(
-        &self,
-        tx_hash: B256,
-        receipt: TransactionReceipt,
-    ) {
+    async fn handle_transaction_receipt(&self, tx_hash: B256, receipt: TransactionReceipt) {
         // Handle reverts
         if !receipt.status() {
             // TODO: Handle better
@@ -243,9 +262,11 @@ impl Sender {
         if let Some(pending_tx) = self.pending.lock().await.remove(&tx_hash) {
             let latency = pending_tx.created_at.elapsed();
             join(
-                self.gas_manager.update_on_confirmation(latency, receipt.effective_gas_price),
+                self.gas_manager
+                    .update_on_confirmation(latency, receipt.effective_gas_price),
                 self.nonce_manager.update_current_nonce(pending_tx.nonce),
-            ).await;
+            )
+            .await;
         }
     }
 
@@ -254,10 +275,7 @@ impl Sender {
         let mut pending_tx = match pending.remove(&tx_hash) {
             Some(tx) => tx,
             None => {
-                println!(
-                    "Transaction {} not found in in-flight pending map",
-                    tx_hash
-                );
+                println!("Transaction {} not found in in-flight pending map", tx_hash);
                 return;
             }
         };
@@ -298,7 +316,7 @@ impl Sender {
             new_priority,
             pending_tx.replacement_count + 1,
         )
-            .await
+        .await
     }
 }
 

@@ -1,20 +1,20 @@
 use alloy::transports::{RpcError, TransportErrorKind};
 use thiserror::Error;
 
-pub mod message;
-pub mod sender;
 pub mod chain;
 mod gas_price;
-mod priority_queue;
+pub mod message;
 mod nonce_manager;
+mod priority_queue;
+pub mod sender;
 
 // Re-export main components for easier use
 pub use chain::Chain;
-pub use sender::Sender;
-pub use message::Message;
 pub(crate) use gas_price::GasPriceManager;
+pub use message::Message;
 pub(crate) use nonce_manager::NonceManager;
 pub(crate) use priority_queue::PriorityQueue;
+pub use sender::Sender;
 
 /// The main error type for the TM library
 #[derive(Error, Debug)]

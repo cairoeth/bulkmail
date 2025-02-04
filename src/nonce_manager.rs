@@ -1,7 +1,7 @@
 use crate::{chain::Chain, Error};
+use alloy::primitives::Address;
 use std::collections::BTreeSet;
 use tokio::sync::Mutex;
-use alloy::primitives::Address;
 
 pub(crate) struct NonceManager {
     chain: Chain,

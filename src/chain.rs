@@ -1,13 +1,15 @@
-use alloy::primitives::{Address, BlockNumber, B256};
-use alloy::rpc::types::{Block, TransactionReceipt};
-use alloy::providers::{ PendingTransactionBuilder, Provider, ProviderBuilder, RootProvider, WsConnect};
-use alloy::pubsub::{PubSubFrontend, Subscription};
-use std::sync::Arc;
 use alloy::consensus::{TxEip1559, TypedTransaction};
 use alloy::network::{Ethereum, EthereumWallet, NetworkWallet};
+use alloy::primitives::{Address, BlockNumber, B256};
+use alloy::providers::{
+    PendingTransactionBuilder, Provider, ProviderBuilder, RootProvider, WsConnect,
+};
+use alloy::pubsub::{PubSubFrontend, Subscription};
+use alloy::rpc::types::{Header, TransactionReceipt};
 use alloy::signers::k256::ecdsa::SigningKey;
 use alloy::signers::local::PrivateKeySigner;
 use alloy::transports::{RpcError, TransportErrorKind};
+use std::sync::Arc;
 use thiserror::Error;
 /// The main error type for the chain module
 #[derive(Error, Debug)]
@@ -45,7 +47,7 @@ impl Chain {
     }
 
     /// Subscribe to new blocks
-    pub async fn subscribe_new_blocks(&self) -> Result<Subscription<Block>, Error> {
+    pub async fn subscribe_new_blocks(&self) -> Result<Subscription<Header>, Error> {
         Ok(self.provider.subscribe_blocks().await?)
     }
 
@@ -65,16 +67,19 @@ impl Chain {
     }
 
     /// Send a transaction and return a watcher
-    pub async fn send_transaction(&self, tx: TxEip1559) -> Result<PendingTransactionBuilder<PubSubFrontend, Ethereum>, Error> {
+    pub async fn send_transaction(
+        &self,
+        tx: TxEip1559,
+    ) -> Result<PendingTransactionBuilder<PubSubFrontend, Ethereum>, Error> {
         // Sign the transaction
         let envelope = <EthereumWallet as NetworkWallet<Ethereum>>::sign_transaction(
             &self.wallet,
-            TypedTransaction::Eip1559(tx)
-        ).await?;
+            TypedTransaction::Eip1559(tx),
+        )
+        .await?;
 
         // Send it and return a watcher
         let pending = self.provider.send_tx_envelope(envelope).await?;
         Ok(pending)
-     }
-
+    }
 }

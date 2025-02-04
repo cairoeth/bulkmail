@@ -72,9 +72,9 @@ impl Default for PriorityQueue {
 
 #[cfg(test)]
 mod tests {
-    use alloy::primitives::Address;
     use super::*;
     use crate::{Error, Message};
+    use alloy::primitives::Address;
 
     #[test]
     fn test_priority_queue() -> Result<(), Error> {
@@ -115,11 +115,11 @@ mod tests {
 
     #[test]
     fn test_prioritized_message_ordering() -> Result<(), Error> {
-        let msg1 = Message{
+        let msg1 = Message {
             priority: 1,
             ..Default::default()
         };
-        let msg2 = Message{
+        let msg2 = Message {
             priority: 2,
             ..Default::default()
         };

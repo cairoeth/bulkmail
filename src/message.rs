@@ -13,7 +13,7 @@ pub struct Message {
     pub to: Option<Address>,
     pub value: U256,
     pub data: Bytes,
-    pub gas: u128,
+    pub gas: u64,
 
     pub priority: u32,
     pub deadline: Option<DateTime<Utc>>,
@@ -26,7 +26,7 @@ impl Message {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         to: Option<Address>,
-        gas: u128,
+        gas: u64,
         value: U256,
         data: Bytes,
         priority: u32,
@@ -135,13 +135,12 @@ mod tests {
     #[test]
     fn test_new_message() {
         let to = Some(Address::default());
-        let gas = 21_000u128;
+        let gas = 21_000u64;
         let value = U256::from(0);
         let data = Bytes::default();
         let priority = 1;
         let deadline = None;
-        let message =
-            Message::new(to, gas, value, data, priority, deadline);
+        let message = Message::new(to, gas, value, data, priority, deadline);
 
         assert_eq!(message.priority, 1);
         assert_eq!(message.retry_count, 0);
@@ -150,13 +149,12 @@ mod tests {
     #[test]
     fn test_effective_priority() {
         let to = Some(Address::default());
-        let gas = 21_000u128;
+        let gas = 21_000u64;
         let value = U256::from(0);
         let data = Bytes::default();
         let priority = 1;
         let deadline = None;
-        let mut message =
-            Message::new(to, gas, value, data, priority, deadline);
+        let mut message = Message::new(to, gas, value, data, priority, deadline);
 
         assert_eq!(message.effective_priority(), 1);
 
@@ -172,13 +170,12 @@ mod tests {
     #[test]
     fn test_can_retry() {
         let to = Some(Address::default());
-        let gas = 21_000u128;
+        let gas = 21_000u64;
         let value = U256::from(0);
         let data = Bytes::default();
         let priority = 1;
         let deadline = None;
-        let mut message =
-            Message::new(to, gas, value, data, priority, deadline);
+        let mut message = Message::new(to, gas, value, data, priority, deadline);
 
         assert!(message.can_retry());
 
